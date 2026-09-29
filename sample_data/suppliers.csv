@@ -1,0 +1,7 @@
+id,name,phone,email,lead_time_days,payment_terms,categories
+SUP01,Kiran Cables Pvt Ltd,+91 98220 11401,orders@kirancables.example,5,30 days,Wires & Cables
+SUP02,Volta Switchgear,+91 98901 22873,sales@voltasg.example,7,45 days,"MCBs, DBs, Switchgear"
+SUP03,Brightline LED Co.,+91 97654 33120,dispatch@brightline.example,4,30 days,LED Lighting
+SUP04,Sai Conduits & Pipes,+91 99700 45521,saiconduits@example.com,3,15 days,"Conduits, Fittings"
+SUP05,Modula Switches,+91 98500 56342,orders@modula.example,6,30 days,Switches & Sockets
+SUP06,Prakash Tools & Accessories,+91 90110 67789,prakashtools@example.com,2,Advance,"Tapes, Tools, Accessories"

@@ -1,0 +1,648 @@
+{
+  "as_of": "2026-09-24",
+  "policy": {
+    "safety_days": 3,
+    "cover_days": 30
+  },
+  "expected_reorders": [
+    {
+      "sku": "ST-0002",
+      "name": "FR PVC Wire 1.5 sqmm 90m",
+      "supplier": "Kiran Cables Pvt Ltd",
+      "on_hand": 17,
+      "on_order": 0,
+      "avg_daily": 3.4,
+      "lead_time_days": 5,
+      "reorder_point": 27.2,
+      "reorder_qty": 110,
+      "est_cost": 178200,
+      "days_of_cover": 5.0
+    },
+    {
+      "sku": "ST-0005",
+      "name": "FR PVC Wire 6.0 sqmm 90m",
+      "supplier": "Kiran Cables Pvt Ltd",
+      "on_hand": 3,
+      "on_order": 0,
+      "avg_daily": 0.78,
+      "lead_time_days": 5,
+      "reorder_point": 6.2,
+      "reorder_qty": 25,
+      "est_cost": 153750,
+      "days_of_cover": 3.8
+    },
+    {
+      "sku": "ST-0010",
+      "name": "MCB 16A Single Pole",
+      "supplier": "Volta Switchgear",
+      "on_hand": 21,
+      "on_order": 0,
+      "avg_daily": 5.67,
+      "lead_time_days": 7,
+      "reorder_point": 56.7,
+      "reorder_qty": 192,
+      "est_cost": 24000,
+      "days_of_cover": 3.7
+    },
+    {
+      "sku": "ST-0012",
+      "name": "RCCB 40A 4 Pole 30mA",
+      "supplier": "Volta Switchgear",
+      "on_hand": 1,
+      "on_order": 0,
+      "avg_daily": 0.33,
+      "lead_time_days": 7,
+      "reorder_point": 3.3,
+      "reorder_qty": 12,
+      "est_cost": 19800,
+      "days_of_cover": 3.0
+    },
+    {
+      "sku": "ST-0017",
+      "name": "LED Bulb 9W Cool White",
+      "supplier": "Brightline LED Co.",
+      "on_hand": 59,
+      "on_order": 0,
+      "avg_daily": 14.17,
+      "lead_time_days": 4,
+      "reorder_point": 99.2,
+      "reorder_qty": 450,
+      "est_cost": 21600,
+      "days_of_cover": 4.2
+    },
+    {
+      "sku": "ST-0026",
+      "name": "PVC Conduit Pipe 20mm 3m",
+      "supplier": "Sai Conduits & Pipes",
+      "on_hand": 22,
+      "on_order": 0,
+      "avg_daily": 18.23,
+      "lead_time_days": 3,
+      "reorder_point": 109.4,
+      "reorder_qty": 600,
+      "est_cost": 22800,
+      "days_of_cover": 1.2
+    },
+    {
+      "sku": "ST-0035",
+      "name": "Modular Switch 6A 1-Way",
+      "supplier": "Modula Switches",
+      "on_hand": 107,
+      "on_order": 0,
+      "avg_daily": 29.28,
+      "lead_time_days": 6,
+      "reorder_point": 263.5,
+      "reorder_qty": 1000,
+      "est_cost": 22000,
+      "days_of_cover": 3.7
+    },
+    {
+      "sku": "ST-0047",
+      "name": "PVC Insulation Tape Black",
+      "supplier": "Prakash Tools & Accessories",
+      "on_hand": 0,
+      "on_order": 0,
+      "avg_daily": 25.61,
+      "lead_time_days": 2,
+      "reorder_point": 128.1,
+      "reorder_qty": 900,
+      "est_cost": 8100,
+      "days_of_cover": 0.0
+    }
+  ],
+  "open_purchase_orders": [
+    {
+      "sku": "ST-0021",
+      "qty": 40,
+      "note": "Mentioned in stock register remarks"
+    }
+  ],
+  "expected_payment_actions": [
+    {
+      "customer_id": "CUS001",
+      "shop": "Ramesh Electricals",
+      "total_balance": 25500,
+      "credit_limit": 50000,
+      "over_limit": false,
+      "overdue_bills": [
+        "ST/5104",
+        "ST/5113"
+      ],
+      "max_days_overdue": 23,
+      "expected_action": "SEND_REMINDER"
+    },
+    {
+      "customer_id": "CUS003",
+      "shop": "Om Sai Hardware",
+      "total_balance": 102500,
+      "credit_limit": 50000,
+      "over_limit": true,
+      "overdue_bills": [
+        "ST/5128",
+        "ST/5129",
+        "ST/5134",
+        "ST/5402"
+      ],
+      "max_days_overdue": 47,
+      "expected_action": "HOLD_NEW_ORDERS"
+    },
+    {
+      "customer_id": "CUS004",
+      "shop": "Jai Bhavani Electricals",
+      "total_balance": 9000,
+      "credit_limit": 150000,
+      "over_limit": false,
+      "overdue_bills": [
+        "ST/5140"
+      ],
+      "max_days_overdue": 15,
+      "expected_action": "SEND_REMINDER"
+    },
+    {
+      "customer_id": "CUS005",
+      "shop": "New Light House",
+      "total_balance": 51000,
+      "credit_limit": 50000,
+      "over_limit": true,
+      "overdue_bills": [],
+      "max_days_overdue": 0,
+      "expected_action": "HOLD_NEW_ORDERS"
+    },
+    {
+      "customer_id": "CUS010",
+      "shop": "Royal Hardware",
+      "total_balance": 237500,
+      "credit_limit": 100000,
+      "over_limit": true,
+      "overdue_bills": [
+        "ST/5410"
+      ],
+      "max_days_overdue": 25,
+      "expected_action": "HOLD_NEW_ORDERS"
+    },
+    {
+      "customer_id": "CUS011",
+      "shop": "Siddhivinayak Electric",
+      "total_balance": 50000,
+      "credit_limit": 100000,
+      "over_limit": false,
+      "overdue_bills": [
+        "ST/5218",
+        "ST/5224"
+      ],
+      "max_days_overdue": 24,
+      "expected_action": "SEND_REMINDER"
+    },
+    {
+      "customer_id": "CUS014",
+      "shop": "Swami Samarth Traders",
+      "total_balance": 75000,
+      "credit_limit": 150000,
+      "over_limit": false,
+      "overdue_bills": [
+        "ST/5249"
+      ],
+      "max_days_overdue": 13,
+      "expected_action": "SEND_REMINDER"
+    },
+    {
+      "customer_id": "CUS017",
+      "shop": "Patil Electric Mart",
+      "total_balance": 61500,
+      "credit_limit": 75000,
+      "over_limit": false,
+      "overdue_bills": [
+        "ST/5273",
+        "ST/5451"
+      ],
+      "max_days_overdue": 33,
+      "expected_action": "HOLD_NEW_ORDERS"
+    },
+    {
+      "customer_id": "CUS019",
+      "shop": "Laxmi Narayan Electric",
+      "total_balance": 30500,
+      "credit_limit": 75000,
+      "over_limit": false,
+      "overdue_bills": [
+        "ST/5287"
+      ],
+      "max_days_overdue": 20,
+      "expected_action": "SEND_REMINDER"
+    },
+    {
+      "customer_id": "CUS023",
+      "shop": "Shivam Hardware",
+      "total_balance": 11000,
+      "credit_limit": 100000,
+      "over_limit": false,
+      "overdue_bills": [
+        "ST/5323"
+      ],
+      "max_days_overdue": 11,
+      "expected_action": "SEND_REMINDER"
+    }
+  ],
+  "expected_orders": [
+    {
+      "customer": "Ramesh Electricals",
+      "items": [
+        {
+          "sku": "ST-0002",
+          "qty": 15
+        },
+        {
+          "sku": "ST-0051",
+          "qty": 10
+        },
+        {
+          "sku": "ST-0047",
+          "qty": 50
+        }
+      ],
+      "note": "1.5mm wire corrected from 20 to 15 by a later message; '20 box' of wire means 20 coils"
+    },
+    {
+      "customer": "Om Sai Hardware",
+      "items": [
+        {
+          "sku": "ST-0035",
+          "qty": 150
+        },
+        {
+          "sku": "ST-0037",
+          "qty": 100
+        },
+        {
+          "sku": "ST-0041",
+          "qty": 50
+        }
+      ],
+      "note": "Switch qty corrected 200\u2192150 next day; multi-line message"
+    },
+    {
+      "customer": "New Light House",
+      "items": [
+        {
+          "sku": "ST-0017",
+          "qty": 300
+        },
+        {
+          "sku": "ST-0018",
+          "qty": 150
+        },
+        {
+          "sku": "ST-0020",
+          "qty": 40
+        }
+      ],
+      "note": "'ye wala panel bhi 20' refers to an image - ambiguous, must go to review, not guessed"
+    },
+    {
+      "customer": "Balaji Electricals",
+      "items": [
+        {
+          "sku": "ST-0010",
+          "qty": 24
+        },
+        {
+          "sku": "ST-0009",
+          "qty": 12
+        },
+        {
+          "sku": "ST-0013",
+          "qty": 2
+        }
+      ],
+      "note": ""
+    },
+    {
+      "customer": "Kalpana Lighting",
+      "items": [
+        {
+          "sku": "ST-0025",
+          "qty": 10
+        },
+        {
+          "sku": "ST-0023",
+          "qty": 5
+        }
+      ],
+      "note": "'smart wifi bulbs' is not in catalogue - flag as unknown product / enquiry"
+    },
+    {
+      "customer": "Mahalaxmi Traders",
+      "items": [
+        {
+          "sku": "ST-0026",
+          "qty": 100
+        },
+        {
+          "sku": "ST-0028",
+          "qty": 200
+        },
+        {
+          "sku": "ST-0029",
+          "qty": 100
+        }
+      ],
+      "note": "The follow-up payment promise is not an order line"
+    },
+    {
+      "customer": "Royal Hardware",
+      "items": [
+        {
+          "sku": "ST-0003",
+          "qty": 200
+        }
+      ],
+      "note": "ANOMALY: ~10x this customer's usual order; exceeds stock; customer is over credit limit"
+    },
+    {
+      "customer": "Deshmukh Electric Works",
+      "items": [
+        {
+          "sku": "ST-0012",
+          "qty": 2
+        },
+        {
+          "sku": "ST-0011",
+          "qty": 4
+        },
+        {
+          "sku": "ST-0015",
+          "qty": 1
+        }
+      ],
+      "note": ""
+    },
+    {
+      "customer": "Siddhivinayak Electric",
+      "items": [
+        {
+          "sku": "ST-0039",
+          "qty": 10
+        },
+        {
+          "sku": "ST-0040",
+          "qty": 10
+        },
+        {
+          "sku": "ST-0044",
+          "qty": 5
+        }
+      ],
+      "note": ""
+    },
+    {
+      "customer": "Pooja Electricals",
+      "items": [
+        {
+          "sku": "ST-0030",
+          "qty": 40
+        },
+        {
+          "sku": "ST-0031",
+          "qty": 30
+        },
+        {
+          "sku": "ST-0032",
+          "qty": 20
+        },
+        {
+          "sku": "ST-0042",
+          "qty": 20
+        }
+      ],
+      "note": "'3m box' = 3 module GI box, not 3 metre"
+    },
+    {
+      "customer": "City Electricals",
+      "items": [
+        {
+          "sku": "ST-0057",
+          "qty": 10
+        },
+        {
+          "sku": "ST-0056",
+          "qty": 50
+        },
+        {
+          "sku": "ST-0053",
+          "qty": 20
+        },
+        {
+          "sku": "ST-0004",
+          "qty": 1
+        }
+      ],
+      "note": "Order split across two messages"
+    },
+    {
+      "customer": "Swami Samarth Traders",
+      "items": [
+        {
+          "sku": "ST-0005",
+          "qty": 5
+        },
+        {
+          "sku": "ST-0059",
+          "qty": 10
+        }
+      ],
+      "note": ""
+    },
+    {
+      "customer": "Patil Electric Mart",
+      "items": [
+        {
+          "sku": "ST-0022",
+          "qty": 15
+        },
+        {
+          "sku": "ST-0021",
+          "qty": 25
+        },
+        {
+          "sku": "ST-0023",
+          "qty": 3
+        }
+      ],
+      "note": ""
+    },
+    {
+      "customer": "Gajanan Electricals",
+      "items": [
+        {
+          "sku": "ST-0008",
+          "qty": 1
+        },
+        {
+          "sku": "ST-0007",
+          "qty": 2
+        }
+      ],
+      "note": ""
+    },
+    {
+      "customer": "Tulja Electricals",
+      "items": [
+        {
+          "sku": "ST-0047",
+          "qty": 100
+        },
+        {
+          "sku": "ST-0048",
+          "qty": 20
+        },
+        {
+          "sku": "ST-0049",
+          "qty": 10
+        },
+        {
+          "sku": "ST-0052",
+          "qty": 10
+        }
+      ],
+      "note": ""
+    },
+    {
+      "customer": "Krishna Light Centre",
+      "items": [
+        {
+          "sku": "ST-0017",
+          "qty": 100
+        },
+        {
+          "sku": "ST-0058",
+          "qty": 5
+        }
+      ],
+      "note": ""
+    }
+  ],
+  "non_orders": [
+    {
+      "from_": "Jai Bhavani Electricals",
+      "why": "'ok' - no order"
+    },
+    {
+      "from_": "A1 Electric Store",
+      "why": "Rate list request - enquiry, not an order"
+    },
+    {
+      "from_": "Shivam Hardware",
+      "why": "Solar panel enquiry - product not stocked"
+    },
+    {
+      "from_": "Mahalaxmi Traders",
+      "why": "Payment promise - not an order line"
+    }
+  ],
+  "anomalies": [
+    {
+      "type": "order_size",
+      "detail": "Royal Hardware ordered 200 coils of 2.5 sqmm wire; their average order for this item is 1.7 coils (>5x rule 3.1). Stock on hand: 101."
+    },
+    {
+      "type": "invoice_price_jump",
+      "detail": "Brightline invoice BL-0874 bills LED Bulb 9W at Rs 63.36 vs last purchase rate Rs 48 (+32%, rule 4.1)."
+    },
+    {
+      "type": "duplicate_invoice",
+      "detail": "Sai Conduits invoice SC-118 received twice (second PDF marked DUPLICATE COPY) - rule 4.2."
+    }
+  ],
+  "data_issues": [
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0009",
+      "issue": "missing_value",
+      "detail": "Purchase rate blank for MCB 6A"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0019",
+      "issue": "missing_value",
+      "detail": "Sale rate blank for LED Bulb 18W"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0028",
+      "issue": "qty_as_text",
+      "detail": "Qty written as text '395 pcs'"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0040",
+      "issue": "negative_qty",
+      "detail": "Qty is -4 (likely counting error)"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0033",
+      "issue": "name_format",
+      "detail": "Name lower-case with extra spaces"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0052",
+      "issue": "missing_code",
+      "detail": "Item code blank for 'Cable Clip 6mm (100 pcs)' - match by name"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0036",
+      "issue": "duplicate_row",
+      "detail": "Appears twice with different qty (157 and 164); latest row says 'recount'"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": "ST-0014",
+      "issue": "supplier_alias",
+      "detail": "Supplier written as 'Volta' (= Volta Switchgear)"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": null,
+      "issue": "section_header_row",
+      "detail": "A text-only section header row sits in the middle of the data"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": null,
+      "issue": "unknown_item",
+      "detail": "Discontinued item not in product master"
+    },
+    {
+      "file": "stock_register.xlsx",
+      "sku": null,
+      "issue": "footer_row",
+      "detail": "Totals row at the bottom of the sheet"
+    },
+    {
+      "file": "customers.xlsx",
+      "sku": null,
+      "issue": "duplicate_customer",
+      "detail": "'Ramesh Electrical' (no code) is the same shop as CUS001 'Ramesh Electricals' - same mobile"
+    },
+    {
+      "file": "customers.xlsx",
+      "sku": null,
+      "issue": "phone_formats",
+      "detail": "Mobile numbers in 4 different formats (+91, leading 0, dash, plain)"
+    },
+    {
+      "file": "outstanding_dues.xlsx",
+      "sku": null,
+      "issue": "mixed_date_types",
+      "detail": "Some bill dates are real dates, some are text 'DD-MM-YYYY'"
+    },
+    {
+      "file": "outstanding_dues.xlsx",
+      "sku": null,
+      "issue": "party_by_name",
+      "detail": "Rows reference customers by shop name, not party code"
+    }
+  ]
+}

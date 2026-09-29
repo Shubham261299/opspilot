@@ -1,0 +1,61 @@
+sku,name,aliases,unit,pack_size,cost_price,sell_price,supplier_id
+ST-0001,FR PVC Wire 1.0 sqmm 90m,1mm wire;1 mm taar;wire 1,coil,10,1150,1390,SUP01
+ST-0002,FR PVC Wire 1.5 sqmm 90m,1.5mm wire;1.5 taar;dedh mm wire,coil,10,1620,1950,SUP01
+ST-0003,FR PVC Wire 2.5 sqmm 90m,2.5mm wire;2.5 taar;dhai mm wire,coil,10,2580,3090,SUP01
+ST-0004,FR PVC Wire 4.0 sqmm 90m,4mm wire;4 mm taar;char mm,coil,5,4120,4890,SUP01
+ST-0005,FR PVC Wire 6.0 sqmm 90m,6mm wire;6 mm taar;wire 6;6 sqmm,coil,5,6150,7290,SUP01
+ST-0006,Flexible Cable 3 Core 1.5 sqmm 100m,3 core cable;3core 1.5;flexible 3 core,coil,5,5400,6350,SUP01
+ST-0007,Coaxial Cable RG6 100m,rg6;coaxial;tv cable,coil,5,1850,2250,SUP01
+ST-0008,LAN Cable Cat6 305m,cat6;lan cable;network cable,box,2,5200,6150,SUP01
+ST-0009,MCB 6A Single Pole,6a mcb;mcb 6 amp;6 amp mcb,piece,12,118,165,SUP02
+ST-0010,MCB 16A Single Pole,16a mcb;mcb 16;16 amp mcb,piece,12,125,175,SUP02
+ST-0011,MCB 32A Double Pole,32a dp mcb;32 amp dp;dp mcb 32,piece,6,420,560,SUP02
+ST-0012,RCCB 40A 4 Pole 30mA,rccb 40;rccb;elcb 40,piece,4,1650,2150,SUP02
+ST-0013,Distribution Board 8 Way SPN,8 way db;db 8 way;8way,piece,4,980,1290,SUP02
+ST-0014,Distribution Board 12 Way TPN,12 way db;tpn db 12;12way,piece,2,2450,3150,SUP02
+ST-0015,Changeover Switch 63A,changeover 63;63a changeover;c/o switch,piece,4,1350,1750,SUP02
+ST-0016,Isolator 63A 4 Pole,isolator 63;63a isolator,piece,4,890,1190,SUP02
+ST-0017,LED Bulb 9W Cool White,9w bulb;9 watt bulb;led 9w,piece,50,48,75,SUP03
+ST-0018,LED Bulb 12W Cool White,12w bulb;12 watt;led 12w,piece,50,62,95,SUP03
+ST-0019,LED Bulb 18W Cool White,18w bulb;18 watt bulb,piece,50,96,145,SUP03
+ST-0020,LED Tube Light 20W 4ft,tube light;20w tube;4 ft tube,piece,25,135,199,SUP03
+ST-0021,LED Panel Light 15W Round,15w panel;round panel 15;panel light,piece,20,210,315,SUP03
+ST-0022,LED Panel Light 18W Square,18w square panel;square panel,piece,20,245,360,SUP03
+ST-0023,LED Flood Light 50W,50w flood;flood light 50,piece,10,640,890,SUP03
+ST-0024,LED Street Light 30W,street light 30;30w street,piece,10,720,990,SUP03
+ST-0025,LED Strip 5m Warm White,led strip;strip light;5m strip,roll,10,280,420,SUP03
+ST-0026,PVC Conduit Pipe 20mm 3m,20mm pipe;conduit 20;pipe 20 mm,length,50,38,58,SUP04
+ST-0027,PVC Conduit Pipe 25mm 3m,25mm pipe;conduit 25;pipe 25,length,50,52,78,SUP04
+ST-0028,Conduit Bend 20mm,20mm bend;bend 20,piece,100,6,11,SUP04
+ST-0029,Conduit Junction Box 20mm 2-Way,junction box;jn box 20;2 way box,piece,100,9,16,SUP04
+ST-0030,Casing Capping 1 inch 2m,casing 1 inch;capping 1;1 inch casing,length,50,34,52,SUP04
+ST-0031,GI Box 3 Module,3m box;3 module box;gi box 3,piece,50,28,45,SUP04
+ST-0032,GI Box 6 Module,6m box;6 module box;gi box 6,piece,50,42,66,SUP04
+ST-0033,GI Box 8 Module,8m box;8 module box;gi box 8,piece,25,55,85,SUP04
+ST-0034,Flexible Pipe 20mm 50m,flexible pipe;flexi pipe 20,roll,5,420,590,SUP04
+ST-0035,Modular Switch 6A 1-Way,6a switch;switch 6 amp;1 way switch,piece,100,22,38,SUP05
+ST-0036,Modular Switch 16A 1-Way,16a switch;power switch;switch 16,piece,50,48,75,SUP05
+ST-0037,Modular Socket 6A 3-Pin,6a socket;socket 6;3 pin socket,piece,50,58,88,SUP05
+ST-0038,Modular Socket 16A 3-Pin,16a socket;power socket;socket 16,piece,25,96,145,SUP05
+ST-0039,Fan Regulator Modular,regulator;fan regulator;step regulator,piece,20,145,215,SUP05
+ST-0040,Bell Push Modular,bell push;bell switch,piece,50,32,52,SUP05
+ST-0041,Plate 3 Module White,3m plate;3 module plate,piece,50,34,55,SUP05
+ST-0042,Plate 6 Module White,6m plate;6 module plate,piece,50,52,82,SUP05
+ST-0043,Plate 8 Module White,8m plate;8 module plate,piece,25,68,105,SUP05
+ST-0044,USB Charger Socket 2.1A,usb socket;usb charger;usb point,piece,20,310,450,SUP05
+ST-0045,TV Socket Modular,tv socket;tv point,piece,50,40,65,SUP05
+ST-0046,Blank Plate 1 Module,blank;blank plate;blank module,piece,100,8,15,SUP05
+ST-0047,PVC Insulation Tape Black,black tape;insulation tape;tape,roll,100,9,16,SUP06
+ST-0048,PVC Insulation Tape Red,red tape,roll,100,9,16,SUP06
+ST-0049,Cable Tie 200mm (100 pcs),cable tie;tie 200;zip tie,packet,20,45,70,SUP06
+ST-0050,Screw 8x1 inch (100 pcs),screw 8x1;screws;pech,packet,20,55,85,SUP06
+ST-0051,Wall Plug 6mm (100 pcs),gitti;wall plug;rawl plug,packet,20,35,55,SUP06
+ST-0052,Cable Clip 6mm (100 pcs),clip 6mm;cable clip;clips,packet,20,28,45,SUP06
+ST-0053,Tester Screwdriver,tester;line tester,piece,50,22,40,SUP06
+ST-0054,Combination Plier 8 inch,plier;pakkad;combination plier,piece,10,165,240,SUP06
+ST-0055,Wire Stripper,stripper;wire stripper,piece,10,140,210,SUP06
+ST-0056,Multi Plug Adapter 3 Pin,multiplug;adapter;3 pin adapter,piece,50,38,65,SUP06
+ST-0057,Extension Board 4 Socket 3m,extension board;extension;spike guard 4,piece,10,265,390,SUP06
+ST-0058,Doorbell Wired Musical,door bell;bell;calling bell,piece,10,180,260,SUP06
+ST-0059,Earthing Wire GI 8 SWG 1kg,earthing wire;gi wire;earth wire,kg,10,95,140,SUP06
+ST-0060,Copper Lug 16 sqmm (pack of 10),lug 16;copper lug,packet,10,120,175,SUP06
