@@ -1,0 +1,34 @@
+# CI: every push and pull request is checked on a fresh machine, from scratch.
+name: CI
+
+# When to run: a push to any branch, and any pull request.
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest # a brand-new Linux virtual machine, lent by GitHub for this run
+    defaults:
+      run:
+        working-directory: backend # every `run:` step below starts in backend/
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v7
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip # reuse downloaded packages between runs, as long as requirements are unchanged
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Check formatting (ruff)
+        run: ruff format --check .
