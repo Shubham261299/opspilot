@@ -329,7 +329,7 @@ class _StockSheetReader:
             )
             return None
         qty = int(number)
-        if qty < 0:
+        if qty <= 0:
             self._issue(
                 IssueType.NEGATIVE_QTY,
                 f"Quantity is {qty}. A stock count can't be negative, so it was not loaded; "
