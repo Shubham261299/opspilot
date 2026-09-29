@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     database_url: str
     log_level: str = "INFO"
+    # Folder holding suppliers.csv and product_master.csv (Docker sets /app/seed_data).
+    seed_data_dir: Path = _REPO_ROOT / "sample_data"
 
 
 @lru_cache
