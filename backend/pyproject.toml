@@ -13,3 +13,5 @@ testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+# A deprecated call in our own code fails the tests, so it gets fixed right away.
+filterwarnings = ["error::DeprecationWarning:app"]
