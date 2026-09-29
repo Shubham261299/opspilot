@@ -191,6 +191,30 @@ now reported as info, as a general rule. Result: 11 of 11, and every error or wa
 planted problem.
 **Why:** Measure before claiming. The key checks the design instead of shaping it.
 
+## 018 · One transaction per upload, and failed files are recorded too (2026-09-29)
+
+**Context:** One upload writes to five tables (uploads, stock_levels, open_po_notes, issues,
+audit_log). A crash halfway must never leave half a stock count.
+**Options:** Save each part as soon as it's ready · one transaction for the whole upload.
+**Choice:** One transaction: all five are saved together or not at all. A file that can't be
+processed (unreadable, no header row) is still saved as a `failed` upload with its own audit row,
+and the API answers 422 with its `upload_id`. A request that isn't a stock file at all (wrong type,
+empty, too large) is refused with 415, 422 or 413 and nothing is saved. Parsing runs in a worker
+thread so a large file doesn't pause other requests. Until sign-in exists, the audit actor is
+`owner`.
+**Why:** The Stock page can never show a half-imported count, and even a bad file leaves a record of
+what happened and when.
+
+## 019 · Money is sent as text in JSON (2026-09-29)
+
+**Context:** Prices are exact `Decimal`s in Python and NUMERIC in Postgres, but JSON numbers become
+floating-point numbers in the browser.
+**Options:** Send numbers (`1150.0`) · send strings (`"1150.00"`).
+**Choice:** Strings, which is Pydantic's default for `Decimal`. The frontend only formats them for
+display and never calculates with them.
+**Why:** The value stays exact all the way to the screen, and calculations stay in the backend
+(decision 002).
+
 ---
 
 ## Ideas

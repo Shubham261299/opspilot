@@ -16,8 +16,10 @@ this repo is invented.
 | --- | --- |
 | API skeleton: health check, structured JSON logs, Docker Compose | ✅ |
 | Database schema with migrations; 6 suppliers and 60 products loaded on start-up | ✅ |
-| Upload the Excel stock register → clean products and stock levels in Postgres | 🚧 week 1 |
-| Issues page: every data problem listed, nothing silently dropped | 🚧 week 1 |
+| Stock register cleaner: reports all 11 problems planted in the sample file, with no false alarms (measured by the answer-key test) | ✅ |
+| API: upload the stock register → clean stock counts, open PO notes and every issue saved in Postgres in one transaction, plus an audit row | ✅ |
+| API: products with current stock (`GET /products`) and issues per upload (`GET /issues`) | ✅ |
+| Web pages: Upload, Stock and Issues | 🚧 week 1 |
 | CI: lint and tests on every push | 🚧 week 1 |
 
 ## Run it locally
@@ -30,7 +32,10 @@ docker compose up --build
 
 On start the API applies database migrations and loads the reference data, then serves:
 
-- API docs: <http://localhost:8000/docs>
+- API docs: <http://localhost:8000/docs>. To try it, open `POST /uploads/stock`, click
+  *Try it out* and choose `sample_data/stock_register.xlsx`
+- Current stock: <http://localhost:8000/products>
+- Issues from the latest upload: <http://localhost:8000/issues>
 - Health check: <http://localhost:8000/health>
 - Database shell: `docker compose exec db psql -U opspilot` (Postgres is published on host port
   5433, so it doesn't clash with a locally installed Postgres)
