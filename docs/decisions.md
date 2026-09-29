@@ -215,11 +215,37 @@ display and never calculates with them.
 **Why:** The value stays exact all the way to the screen, and calculations stay in the backend
 (decision 002).
 
+## 020 · The browser talks to one address; /api is forwarded to the API (2026-09-29)
+
+**Context:** The React app and FastAPI run as separate servers. A browser blocks calls to a
+different address unless the API explicitly allows them (CORS).
+**Options:** Configure CORS on the API · serve both from one address and forward API calls.
+**Choice:** The frontend always calls `/api/...`. In Docker, nginx serves the built app on port
+3000 and forwards `/api/` to the API container; in development, Vite's dev server does the same.
+nginx looks the API up again every 10 seconds, so it keeps working when the API container is
+recreated.
+**Why:** No CORS rules to get wrong, identical code in development and Docker, and in production the
+API doesn't need its own public address.
+
+## 021 · A small frontend: React's own tools first (2026-09-29)
+
+**Context:** Three pages this week; the live Approval Inbox arrives in week 3.
+**Options:** Add a data-fetching library (TanStack Query) and a global store (Redux, Zustand) now ·
+start with React's own tools.
+**Choice:** React Router for pages, one typed API client (`src/lib/api.ts`) and a small `useApi`
+hook. shadcn/ui components are copied into `src/components/ui`, so they are our code and can be
+edited. Stock search runs in the browser over the 60 products.
+**Why:** Fewer new concepts at once and nothing that isn't needed yet. Revisit when the Approval
+Inbox needs live updates and caching.
+
 ---
 
 ## Ideas
 
 Out of scope for the current phase; pick up when the phase allows.
+
+- Frontend tests with Vitest and Testing Library (upload flow, search, issue grouping).
+- Server-side product search once the catalogue grows past a few hundred products.
 
 - Make `audit_log` append-only inside the database (a trigger that rejects UPDATE and DELETE).
 - A seed option that applies changes from `product_master.csv` to existing products (for example

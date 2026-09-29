@@ -19,7 +19,7 @@ this repo is invented.
 | Stock register cleaner: reports all 11 problems planted in the sample file, with no false alarms (measured by the answer-key test) | ✅ |
 | API: upload the stock register → clean stock counts, open PO notes and every issue saved in Postgres in one transaction, plus an audit row | ✅ |
 | API: products with current stock (`GET /products`) and issues per upload (`GET /issues`) | ✅ |
-| Web pages: Upload, Stock and Issues | 🚧 week 1 |
+| Web app: Upload (drag and drop), Stock (table with search), Issues (grouped by type) | ✅ |
 | CI: lint and tests on every push | 🚧 week 1 |
 
 ## Run it locally
@@ -30,10 +30,12 @@ Requires Docker Desktop.
 docker compose up --build
 ```
 
-On start the API applies database migrations and loads the reference data, then serves:
+Then open **<http://localhost:3000>** and drop `sample_data/stock_register.xlsx` on the Upload page.
 
-- API docs: <http://localhost:8000/docs>. To try it, open `POST /uploads/stock`, click
-  *Try it out* and choose `sample_data/stock_register.xlsx`
+On start the API applies database migrations and loads the reference data. Also available:
+
+- API docs: <http://localhost:8000/docs>. To try the upload there, open `POST /uploads/stock`,
+  click *Try it out* and choose `sample_data/stock_register.xlsx`
 - Current stock: <http://localhost:8000/products>
 - Issues from the latest upload: <http://localhost:8000/issues>
 - Health check: <http://localhost:8000/health>
@@ -52,10 +54,23 @@ pytest                           # unit tests + database tests
 ruff check . && ruff format --check .
 ```
 
+Frontend, with instant reload while you edit (needs the API running on port 8000):
+
+```bash
+cd frontend
+npm install
+npm run dev                      # http://localhost:5173
+npm run typecheck && npm run lint && npm run build
+```
+
 ## Stack
 
-Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2 (async) · Alembic · PostgreSQL 16 ·
-Docker Compose. More pieces arrive as the features that need them ship.
+- **Backend:** Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2 (async) · Alembic · pandas ·
+  PostgreSQL 16
+- **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS · shadcn/ui · React Router
+- **Running it:** Docker Compose (Postgres, API, nginx serving the web app)
+
+More pieces arrive as the features that need them ship.
 
 ## Design decisions
 
