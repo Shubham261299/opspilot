@@ -1,0 +1,12 @@
+# Store text files with LF line endings, even on Windows, so shell commands
+# and Docker builds behave the same on every machine.
+* text=auto eol=lf
+
+# Sample data stays byte-for-byte as generated (no line-ending conversion).
+sample_data/** -text
+
+*.xlsx binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.gif binary
