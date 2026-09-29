@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 
-from app.api import health
+from app.api import health, issues, products, uploads
 from app.api.errors import error_response, register_error_handlers
 from app.config import get_settings
 from app.db.session import get_engine
@@ -26,6 +26,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="OpsPilot API", version="0.1.0", lifespan=lifespan)
 register_error_handlers(app)
 app.include_router(health.router)
+app.include_router(uploads.router)
+app.include_router(products.router)
+app.include_router(issues.router)
 
 
 @app.middleware("http")

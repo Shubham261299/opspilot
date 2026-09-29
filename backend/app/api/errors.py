@@ -14,7 +14,19 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.intake.errors import UploadRejected
 from app.logging_config import request_id_var
+
+
+class ApiError(Exception):
+    """An error the API returns on purpose, with a stable code the frontend can rely on."""
+
+    def __init__(self, status_code: int, code: str, message: str, details: Any = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
+        self.details = details
 
 
 def error_response(status_code: int, code: str, message: str, details: Any = None) -> JSONResponse:
@@ -25,6 +37,14 @@ def error_response(status_code: int, code: str, message: str, details: Any = Non
 
 
 def register_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(ApiError)
+    async def handle_api_error(_: Request, exc: ApiError) -> JSONResponse:
+        return error_response(exc.status_code, exc.code, exc.message, exc.details)
+
+    @app.exception_handler(UploadRejected)
+    async def handle_upload_rejected(_: Request, exc: UploadRejected) -> JSONResponse:
+        return error_response(422, exc.code, exc.message, {"upload_id": exc.upload_id})
+
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(_: Request, exc: StarletteHTTPException) -> JSONResponse:
         code = "not_found" if exc.status_code == 404 else f"http_{exc.status_code}"

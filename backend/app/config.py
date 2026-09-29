@@ -5,6 +5,7 @@ pydantic-settings fills each field from the environment variable of the same nam
 malformed setting fails immediately instead of deep inside a request.
 """
 
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
@@ -22,6 +23,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     # Folder holding suppliers.csv and product_master.csv (Docker sets /app/seed_data).
     seed_data_dir: Path = _REPO_ROOT / "sample_data"
+    max_upload_mb: int = 5
+    # Pin "today" (e.g. 2026-09-24, the sample data's date) for demos; unset = the real date.
+    app_today: date | None = None
 
 
 @lru_cache

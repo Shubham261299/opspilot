@@ -8,11 +8,13 @@ In CI: TEST_DATABASE_URL points at the Postgres service container.
 import asyncio
 import os
 from collections.abc import AsyncIterator
+from datetime import date
 from pathlib import Path
 
 import pytest
 from alembic import command
 from alembic.config import Config
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy import make_url, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import (
@@ -24,9 +26,15 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.pool import NullPool
 
 from app.db.models import Base
+from app.db.seed import ProductRow, SupplierRow, read_csv_rows, seed_reference_data
 
 DEFAULT_TEST_DATABASE_URL = "postgresql+asyncpg://opspilot:opspilot@localhost:5433/opspilot_test"
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
 BACKEND_DIR = Path(__file__).resolve().parents[2]
+TEST_TODAY = date(2026, 9, 29)
+
+# The app reads DATABASE_URL at import; make sure it can only ever see the test database.
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
 
 async def _recreate_schema(database_url: str) -> None:
@@ -53,7 +61,7 @@ async def _recreate_schema(database_url: str) -> None:
 @pytest.fixture(scope="session")
 def database_url() -> str:
     """URL of an empty, fully migrated test database (prepared once per test run)."""
-    url = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
+    url = TEST_DATABASE_URL
     database = make_url(url).database or ""
     if not database.endswith("_test"):
         pytest.exit(
@@ -99,3 +107,36 @@ async def db_engine(database_url: str) -> AsyncIterator[AsyncEngine]:
 async def db_session(db_engine: AsyncEngine) -> AsyncIterator[AsyncSession]:
     async with async_sessionmaker(db_engine, expire_on_commit=False)() as session:
         yield session
+
+
+@pytest.fixture
+async def seeded(db_session: AsyncSession, sample_data_dir: Path) -> None:
+    """The 6 suppliers and 60 products from the sample CSVs."""
+    await seed_reference_data(
+        db_session,
+        read_csv_rows(sample_data_dir / "suppliers.csv", SupplierRow),
+        read_csv_rows(sample_data_dir / "product_master.csv", ProductRow),
+    )
+
+
+@pytest.fixture
+async def client(db_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
+    """An HTTP client that calls the app directly (no server), using the test database.
+
+    httpx's ASGITransport hands each request straight to the FastAPI app in this process.
+    """
+    from app.api.deps import get_today
+    from app.db.session import get_session
+    from app.main import app  # imported here, after DATABASE_URL points at the test database
+
+    sessions = async_sessionmaker(db_engine, expire_on_commit=False)
+
+    async def test_session() -> AsyncIterator[AsyncSession]:
+        async with sessions() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = test_session
+    app.dependency_overrides[get_today] = lambda: TEST_TODAY
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
+        yield http
+    app.dependency_overrides.clear()
