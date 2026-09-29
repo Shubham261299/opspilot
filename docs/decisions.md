@@ -126,6 +126,71 @@ human reviews it. Two tests guard the process: the models must match the migrati
 (`alembic check`), and every migration must downgrade and upgrade cleanly.
 **Why:** Less typing and fewer mistakes, and a forgotten migration fails CI instead of production.
 
+## 013 · How the stock register is read (2026-09-29)
+
+**Context:** The sheet has title rows above the header, a section row mid-table, a totals footer
+and a second "Notes" sheet. Row numbers in issues must match what the owner sees in Excel.
+**Options:** Assume fixed positions (header on row 4) · detect the structure.
+**Choice:** pandas reads each sheet as a raw grid (`header=None`, `dtype=object`,
+`keep_default_na=False`). The header is the first row whose titles match known synonyms
+("Qty In Stock", "Item Code", …). Plain Python then classifies each row: blank rows are ignored;
+title, section and totals rows become `skipped_row` info issues; other sheets with content become
+an `other_sheet` issue.
+**Why:** The same code survives an extra title line or reordered columns. `keep_default_na=False`
+matters: by default pandas turns text like "n/a" or "NA" into blank cells, hiding it from every
+check.
+
+## 014 · When the sheet disagrees with itself or with the master (2026-09-29)
+
+**Context:** A register row can conflict with another row (duplicates) or with the product
+master (code vs name, unit, rates, supplier).
+**Options:** Trust the sheet · trust the master · refuse to guess and ask a human.
+**Choice:**
+
+- Same product twice: the last row wins (a later line is a correction, e.g. "recount"); the issue
+  shows both counts.
+- Item code and name that disagree: not loaded.
+- Blank code: matched only by an exact name or a unique alias; otherwise not loaded.
+- Unit different from the master's: not loaded (converting would be a guess). Spelling variants
+  (NOS, Pcs, coils, …) are normalised and listed once per file.
+- Rates and supplier: the master is kept; blanks and differences become issues. A stock count
+  never changes prices.
+- A name that differs only in spaces or capitals: loaded, reported as info.
+
+**Why:** A stock count answers "how many are in the godown", nothing more. Anything uncertain goes
+to a human instead of into the numbers.
+
+## 015 · Each issue type has one fixed severity (2026-09-29)
+
+**Context:** The Issues page should show what matters first, and the same problem should always
+look the same.
+**Options:** Decide severity case by case · fix it per issue type.
+**Choice:** error = not loaded; warning = loaded, but check it; info = handled automatically and
+listed for transparency. The mapping lives in `app/intake/issues.py`, and a test checks every type
+has one.
+**Why:** The owner learns what each level means once, and it never changes.
+
+## 016 · Dates written without a year (2026-09-29)
+
+**Context:** People write "24/9" and "22/9"; the year has to come from somewhere.
+**Options:** Always assume the current year · the latest such date on or before a reference date.
+**Choice:** The latest such date on or before the reference: the upload date for the count date,
+the count date for dates inside remarks. Day first, the Indian way.
+**Why:** A count uploaded on 5 January saying "28/12" means last December, not the coming one.
+
+## 017 · Built from the data first, then measured against the answer key (2026-09-29)
+
+**Context:** `sample_data/answer_key.json` lists the planted problems. Reading it first invites
+special cases that pass the test without being robust.
+**Options:** Tune the cleaner using the key · design from the data, then measure.
+**Choice:** The cleaner was designed from the spreadsheet alone. The key was opened only to write
+`test_stock_register_answer_key.py`. First run: 10 of 11 planted problems reported. The miss was
+row 19 ("  gi box 8 module  "), judged harmless because the item code identifies the product. That
+contradicted "nothing changes silently", so any name that differs only in spaces or capitals is
+now reported as info, as a general rule. Result: 11 of 11, and every error or warning raised is a
+planted problem.
+**Why:** Measure before claiming. The key checks the design instead of shaping it.
+
 ---
 
 ## Ideas
