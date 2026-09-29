@@ -1,4 +1,4 @@
-# Run everything:  docker compose up --build
+# Run everything:  docker compose up --build   then open http://localhost:3000
 name: opspilot
 
 services:
@@ -31,6 +31,21 @@ services:
       - "8000:8000"
     depends_on:
       db:
+        condition: service_healthy
+    healthcheck:
+      # healthy = the API answers /health, which also checks the database
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  web:
+    build: ./frontend
+    ports:
+      - "3000:80" # the web app: http://localhost:3000
+    depends_on:
+      api:
         condition: service_healthy
 
 volumes:
