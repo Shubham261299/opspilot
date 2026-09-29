@@ -1,0 +1,13 @@
+# The API image is built from the repo root so it can include the two seed CSVs.
+# This is an allow-list: everything is excluded unless re-included below.
+# sample_data/answer_key.json is deliberately never included (tests only).
+*
+!backend/
+!sample_data/suppliers.csv
+!sample_data/product_master.csv
+
+backend/.venv/
+backend/tests/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
