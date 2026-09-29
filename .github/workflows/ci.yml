@@ -6,6 +6,10 @@ on:
   push:
   pull_request:
 
+# Every run gets a temporary token (a key to this repo). CI only needs to read the code.
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend
@@ -59,3 +63,34 @@ jobs:
 
       - name: Tests (pytest)
         run: pytest -v # -v prints every test's name, so the log shows exactly what ran
+
+  # No `needs:` between the two jobs, so they run at the same time, each on its own fresh machine.
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend # every `run:` step below starts in frontend/
+
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v7
+
+      - name: Install Node 24
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24" # same major version as frontend/Dockerfile
+          cache: npm # reuse downloaded packages between runs, as long as package-lock.json is unchanged
+          cache-dependency-path: frontend/package-lock.json # `with:` paths start at the repo root
+
+      - name: Install dependencies
+        run: npm ci # exactly the versions in package-lock.json, into an empty node_modules
+
+      - name: Type-check (tsc)
+        run: npm run typecheck
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Build (vite)
+        run: npm run build
