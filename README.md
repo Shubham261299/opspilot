@@ -1,5 +1,7 @@
 # OpsPilot
 
+[![CI](https://github.com/Shubham261299/opspilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Shubham261299/opspilot/actions/workflows/ci.yml)
+
 An AI back office for a small distributor. OpsPilot turns messy WhatsApp orders, an Excel stock
 sheet and PDF supplier invoices into clean data. Agents then propose actions (reorders, payment
 reminders, anomaly flags), and the owner approves every action before anything happens.
@@ -20,7 +22,7 @@ this repo is invented.
 | API: upload the stock register → clean stock counts, open PO notes and every issue saved in Postgres in one transaction, plus an audit row | ✅ |
 | API: products with current stock (`GET /products`) and issues per upload (`GET /issues`) | ✅ |
 | Web app: Upload (drag and drop), Stock (table with search), Issues (grouped by type) | ✅ |
-| CI: lint and tests on every push | 🚧 week 1 |
+| CI on every pull request and push to `main`: lint, tests against a real Postgres, frontend type-check, lint and build | ✅ |
 
 ## Run it locally
 
@@ -69,6 +71,7 @@ npm run typecheck && npm run lint && npm run build
   PostgreSQL 16
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS · shadcn/ui · React Router
 - **Running it:** Docker Compose (Postgres, API, nginx serving the web app)
+- **CI:** GitHub Actions (backend and frontend jobs in parallel, Postgres as a service container)
 
 More pieces arrive as the features that need them ship.
 
