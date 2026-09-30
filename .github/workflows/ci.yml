@@ -1,9 +1,11 @@
-# CI: every push and pull request is checked on a fresh machine, from scratch.
+# CI: checks the code on a fresh machine, from scratch.
 name: CI
 
-# When to run: a push to any branch, and any pull request.
+# When to run: a push to main, and any pull request (which tests the result of merging it).
+# Other branches are checked through their pull request, so the same code isn't tested twice.
 on:
   push:
+    branches: [main]
   pull_request:
 
 # Every run gets a temporary token (a key to this repo). CI only needs to read the code.
