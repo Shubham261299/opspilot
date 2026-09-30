@@ -238,6 +238,28 @@ edited. Stock search runs in the browser over the 60 products.
 **Why:** Fewer new concepts at once and nothing that isn't needed yet. Revisit when the Approval
 Inbox needs live updates and caching.
 
+## 022 · CI on GitHub Actions, with a real Postgres (2026-09-30)
+
+**Context:** Every change should prove, on a clean machine, that the code still lints, passes its
+tests and builds. The integration tests need a database.
+**Options:** Database in CI: SQLite · a Postgres service container. Triggers: every push to every
+branch · pushes to `main` plus pull requests.
+**Choice:** One workflow, `.github/workflows/ci.yml`, with two jobs that run in parallel:
+
+- Backend: ruff (lint and format check), then pytest against a throwaway `postgres:16-alpine`
+  service container, the same image as Docker Compose.
+- Frontend: `npm ci`, type-check, oxlint, build.
+
+It runs on pushes to `main` and on pull requests, which test the result of the merge. pip and npm
+downloads are cached, and the run's token can only read the code. The actions are GitHub's own,
+pinned to a major version (`@v7`) so fixes arrive automatically; pinning exact commits becomes
+worth it if third-party actions are added. A red check doesn't block merging yet (see Ideas).
+**Why:** Tests run on the database the app really uses, so constraints, NUMERIC and
+`ON CONFLICT` behave exactly as they do in the app. Parallel jobs keep a run near 40 seconds (38 s
+measured). Push checks on every branch would test the same code twice. PR #1 showed it working: a
+deliberate one-character bug (`qty < 0` → `qty <= 0`) failed 8 tests and turned the check red
+before it could reach `main`.
+
 ---
 
 ## Ideas
@@ -246,7 +268,8 @@ Out of scope for the current phase; pick up when the phase allows.
 
 - Frontend tests with Vitest and Testing Library (upload flow, search, issue grouping).
 - Server-side product search once the catalogue grows past a few hundred products.
-
 - Make `audit_log` append-only inside the database (a trigger that rejects UPDATE and DELETE).
 - A seed option that applies changes from `product_master.csv` to existing products (for example
   new aliases), shown as a diff and applied only after approval.
+- Require green CI checks before anything merges into `main` (a GitHub branch rule), once all
+  changes go through pull requests.
