@@ -260,6 +260,93 @@ measured). Push checks on every branch would test the same code twice. PR #1 sho
 deliberate one-character bug (`qty < 0` → `qty <= 0`) failed 8 tests and turned the check red
 before it could reach `main`.
 
+## 023 · A 7-week roadmap instead of 12 (2026-10-01)
+
+**Context:** Week 1 shipped the stock upload, the Issues page and CI. The original plan spread the
+rest over eleven more weeks; the project should be showable sooner.
+**Options:** Keep 12 weeks · cut features · keep the features, reorder them and build in bigger
+steps.
+**Choice:** Seven weeks in total, each ending with something that works:
+
+| Week | Release | Main pieces |
+| --- | --- | --- |
+| 1 | v0.1 | Stock register upload, Issues page, CI |
+| 2 | v0.2a | Customers, dues and sales history; reorder and payment rules; proposals and the Approval Inbox |
+| 3 | v0.2 | LiteLLM, LangGraph agents that pause for approval, WhatsApp orders, README screenshots |
+| 4 | v0.3a | PDF invoices, anomaly agent, live inbox over WebSockets |
+| 5 | v0.3 | Langfuse tracing, eval suite in CI |
+| 6 | v0.4 | Policy search with pgvector; proposals cite the rule they follow |
+| 7 | v1.0 | Public demo, final README; live WhatsApp as a stretch goal |
+
+**Why:** The AI part arrives in week 3 instead of later, nothing is dropped, and live WhatsApp,
+which depends on Meta's developer setup, can't block the release.
+
+## 024 · LLM provider: Ollama now, a hosted model only for the public demo (2026-10-01)
+
+**Context:** LLM calls start in week 3. They should cost nothing during development, and the
+public demo can't reach a model running on a laptop.
+**Options:** A hosted API from the start · Ollama locally, a hosted model later.
+**Choice:** Ollama for all development and local runs. When the demo goes public, the Gemini free
+tier is added through configuration only (LiteLLM model name and API key in environment
+variables).
+**Why:** Free and private while building. Because every call goes through LiteLLM (`app/llm/`),
+switching providers is a settings change, not a code change.
+
+## 025 · Customers come in by upload; dues and sales are snapshots (2026-10-05)
+
+**Context:** The customer list is messy (four phone formats, a duplicate shop without a code), and
+the dues and sales files are full exports, not changes.
+**Options:** Seed customers on start-up like products · upload them with issue rows. For dues and
+sales: add each file to the last · treat each upload as a full snapshot.
+**Choice:** Customers are uploaded. A known party code updates that customer's details; a new
+one adds a customer; what changed goes into the audit row; `on_hold` is never touched by an upload.
+A row without a code is never given one: if its phone or name matches an existing customer it is
+reported as a likely duplicate. Dues and sales uploads are snapshots, like stock counts
+(decision 010): the latest one is current. Dues need customers first; a dues file before any
+customers is refused and recorded as a failed upload.
+**Why:** Every correction stays visible as an issue, a re-upload can't double-count bills or
+sales, and only an approved proposal can put a customer on hold.
+
+## 026 · How the reorder and credit rules are calculated (2026-10-05)
+
+**Context:** `company_policy.pdf` sections 1 and 2. A wrong quantity or a wrongly held customer
+costs money or goodwill.
+**Options:** Floating-point formulas · exact arithmetic.
+**Choice:** Pure functions in `domain/reorder.py` and `domain/credit.py`. Decisions use whole
+numbers (`on_hand × 90 ≤ sold × (lead time + 3)`), so a product exactly on its reorder point is
+always treated the same way; figures are rounded only for display. Following the policy's
+wording, a hold needs a bill *more than* 30 days overdue (or a balance above the limit), a
+reminder needs 7 or more, and a customer gets one action, the hold winning. A purchase order
+above ₹1,00,000 is marked "owner approval" (policy 1.5).
+**Why:** Measured against the answer key: 8 of 8 reorders with exact quantities and 10 of 10
+payment actions. Two displayed figures differ and the test documents why rather than tuning the
+code: days of cover uses the exact daily average (the key divides by the rounded one), and the
+key lists only bills 7 or more days overdue while policy 2.2 counts a bill as overdue from day 1.
+
+## 027 · Proposals: one pending per subject, decided once, never re-asked (2026-10-05)
+
+**Context:** Checks can run any number of times, and two clicks on Approve can arrive together.
+**Options:** Let the code be careful · let the database enforce the rules as well.
+**Choice:** Statuses `pending → approved | rejected`, or `superseded` when newer data changes
+the numbers. The database allows at most one pending proposal per kind and product or customer
+(partial unique indexes). Running checks is idempotent: same numbers keep the pending proposal,
+new numbers replace it, and a situation already approved or rejected with the same numbers is not
+proposed again. Approve and reject lock the proposal row (`SELECT … FOR UPDATE`), so a second
+click waits and then gets a 409; a test fires two approvals at once and gets exactly one purchase
+order. Two simultaneous runs queue on a Postgres advisory lock. Each decision, with what it
+created, is one transaction with its audit row.
+**Why:** The inbox never fills with duplicates, the owner isn't asked the same question twice, and
+nothing can be ordered twice by accident.
+
+## 028 · The demo runs on the sample data's date (2026-10-05)
+
+**Context:** Overdue days and the 90-day sales window depend on "today". The sample data
+describes 24 Sep 2026; a week later every bill would be seven days more overdue.
+**Options:** Use the real date · pin the demo's date.
+**Choice:** Docker Compose sets `APP_TODAY=2026-09-24` by default; it can be overridden, and
+without it the API uses the real date.
+**Why:** The demo gives the policy's answers for its own data whenever it is run.
+
 ---
 
 ## Ideas
@@ -273,3 +360,7 @@ Out of scope for the current phase; pick up when the phase allows.
   new aliases), shown as a diff and applied only after approval.
 - Require green CI checks before anything merges into `main` (a GitHub branch rule), once all
   changes go through pull requests.
+- Release a hold (an approved, audited action) once the customer pays.
+- Purchase order follow-up: mark a PO sent and received, so received stock stops counting as on
+  order.
+- A pending count next to "Approval Inbox" in the navigation.
