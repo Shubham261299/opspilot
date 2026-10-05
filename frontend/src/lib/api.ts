@@ -27,11 +27,121 @@ export interface PoNote {
   source_row: number
 }
 
-export interface StockUploadResult {
+/** What every upload endpoint answers; each kind of file adds a few fields. */
+export interface UploadSummary {
   upload: Upload
   issues_by_severity: Record<Severity, number>
   issues_by_type: Record<string, number>
+}
+
+export interface StockUploadResult extends UploadSummary {
   po_notes: PoNote[]
+}
+
+export interface CustomersUploadResult extends UploadSummary {
+  added: string[] // party codes added by this file
+  updated: string[] // party codes whose details changed
+}
+
+export interface DuesUploadResult extends UploadSummary {
+  bills_loaded: number
+  total_balance: string
+}
+
+export interface SalesUploadResult extends UploadSummary {
+  lines_loaded: number
+  last_sale: string | null
+}
+
+export interface UploadList {
+  items: Upload[]
+}
+
+export interface Customer {
+  code: string
+  shop_name: string
+  contact_person: string | null
+  phone: string | null // "+919895822412"
+  area: string | null
+  credit_limit: string
+  credit_days: number
+  on_hold: boolean
+  hold_reason: string | null
+  balance: string // unpaid total in the current dues file
+  open_bills: number
+  oldest_bill_date: string | null
+}
+
+export interface CustomerList {
+  dues_upload_id: number | null
+  dues_as_of: string | null
+  items: Customer[]
+}
+
+export type ProposalKind = 'reorder' | 'payment_reminder' | 'hold_orders'
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'superseded'
+
+export interface OverdueBill {
+  bill_no: string
+  bill_date: string
+  balance: string
+  days_overdue: number
+}
+
+/** The calculated figures behind a proposal. Which ones are present depends on the kind. */
+export interface ProposalNumbers {
+  // reorder
+  on_hand?: number
+  on_order?: number
+  avg_daily?: string
+  lead_time_days?: number
+  reorder_point?: string
+  days_of_cover?: string | null
+  qty?: number
+  pack_size?: number
+  unit?: string
+  unit_cost?: string
+  est_cost?: string
+  needs_owner?: boolean
+  supplier_code?: string
+  supplier_name?: string
+  // payment_reminder, hold_orders
+  total_balance?: string
+  credit_limit?: string
+  credit_days?: number
+  over_limit?: boolean
+  max_days_overdue?: number
+  overdue_bills?: OverdueBill[]
+}
+
+export interface Proposal {
+  id: number
+  kind: ProposalKind
+  status: ProposalStatus
+  subject: { type: 'product' | 'customer'; code: string; name: string }
+  numbers: ProposalNumbers
+  reason: string
+  basis: Record<string, unknown>
+  created_at: string
+  decided_at: string | null
+  decided_by: string | null
+  decision_note: string | null
+  purchase_order_id: number | null
+  payment_reminder_id: number | null
+  reminder_message: string | null
+}
+
+export interface ProposalList {
+  items: Proposal[]
+}
+
+export interface RunChecksResult {
+  created: number
+  unchanged: number
+  superseded: number
+  already_decided: number
+  pending: number
+  not_checked: string[]
 }
 
 export interface Product {
@@ -64,6 +174,8 @@ export interface Issue {
   detail: string
   sku: string | null
   product_name: string | null
+  customer_code: string | null
+  customer_name: string | null
   raw: Record<string, unknown> | null
   resolved: boolean
 }
@@ -130,16 +242,49 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
+export type UploadKind = 'stock' | 'customers' | 'dues' | 'sales'
+
+function upload<T>(kind: UploadKind, file: File): Promise<T> {
+  const form = new FormData()
+  form.append('file', file)
+  return request(`/uploads/${kind}`, { method: 'POST', body: form })
+}
+
+function postJson<T>(path: string, body?: unknown): Promise<T> {
+  return request(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+
 export const api = {
-  uploadStockRegister(file: File): Promise<StockUploadResult> {
-    const form = new FormData()
-    form.append('file', file)
-    return request('/uploads/stock', { method: 'POST', body: form })
+  uploadStockRegister: (file: File) => upload<StockUploadResult>('stock', file),
+  uploadCustomers: (file: File) => upload<CustomersUploadResult>('customers', file),
+  uploadDues: (file: File) => upload<DuesUploadResult>('dues', file),
+  uploadSales: (file: File) => upload<SalesUploadResult>('sales', file),
+  uploads(): Promise<UploadList> {
+    return request('/uploads')
   },
   products(): Promise<ProductList> {
     return request('/products')
   },
+  customers(): Promise<CustomerList> {
+    return request('/customers')
+  },
   issues(uploadId?: number): Promise<IssueList> {
     return request(uploadId ? `/issues?upload_id=${uploadId}` : '/issues')
+  },
+  proposals(status: ProposalStatus): Promise<ProposalList> {
+    return request(`/proposals?status=${status}`)
+  },
+  runChecks(): Promise<RunChecksResult> {
+    return postJson('/proposals/run')
+  },
+  approve(id: number, note?: string): Promise<Proposal> {
+    return postJson(`/proposals/${id}/approve`, { note: note || null })
+  },
+  reject(id: number, note?: string): Promise<Proposal> {
+    return postJson(`/proposals/${id}/reject`, { note: note || null })
   },
 }

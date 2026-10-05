@@ -1,6 +1,6 @@
 import { CircleX } from 'lucide-react'
 import { Fragment, useCallback, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { PageHeader } from '@/components/PageHeader'
@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useApi } from '@/hooks/useApi'
-import { api, type Issue } from '@/lib/api'
+import { api, type Issue, type Upload } from '@/lib/api'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { groupIssues, SEVERITIES, SEVERITY_MEANING } from '@/lib/issues'
 
@@ -22,6 +22,7 @@ export function IssuesPage() {
   const uploadId = Number(params.get('upload')) || undefined
   const load = useCallback(() => api.issues(uploadId), [uploadId])
   const { data, error, loading } = useApi(load)
+  const uploads = useApi(api.uploads)
 
   const issues = useMemo(() => data?.items ?? [], [data])
   const groups = useMemo(() => groupIssues(issues), [issues])
@@ -36,6 +37,11 @@ export function IssuesPage() {
             ? `${upload.filename} · upload #${upload.id} · uploaded ${formatDateTime(upload.created_at)}` +
               (upload.as_of ? ` · count of ${formatDate(upload.as_of)}` : '')
             : 'Every problem found in the latest upload. Nothing is dropped silently.'
+        }
+        actions={
+          uploads.data && uploads.data.items.length > 0 ? (
+            <UploadPicker uploads={uploads.data.items} selected={upload?.id ?? null} />
+          ) : undefined
         }
       />
 
@@ -98,7 +104,7 @@ function IssueTable({ issues }: { issues: Issue[] }) {
       <TableHeader>
         <TableRow>
           <TableHead className="w-16 pl-6">Row</TableHead>
-          <TableHead className="w-56">Product</TableHead>
+          <TableHead className="w-56">Product / customer</TableHead>
           <TableHead className="pr-6">What happened</TableHead>
         </TableRow>
       </TableHeader>
@@ -107,10 +113,10 @@ function IssueTable({ issues }: { issues: Issue[] }) {
           <TableRow key={issue.id}>
             <TableCell className="pl-6 align-top tabular-nums">{issue.source_row ?? 'File'}</TableCell>
             <TableCell className="align-top whitespace-normal">
-              {issue.sku ? (
+              {issue.sku || issue.customer_code ? (
                 <>
-                  <div className="font-mono text-xs">{issue.sku}</div>
-                  <div className="text-xs text-muted-foreground">{issue.product_name}</div>
+                  <div className="font-mono text-xs">{issue.sku ?? issue.customer_code}</div>
+                  <div className="text-xs text-muted-foreground">{issue.product_name ?? issue.customer_name}</div>
                 </>
               ) : (
                 <span className="text-muted-foreground">—</span>
@@ -142,5 +148,32 @@ function OriginalCells({ raw }: { raw: Record<string, unknown> }) {
         ))}
       </dl>
     </details>
+  )
+}
+
+const KIND_NAMES: Record<string, string> = {
+  stock_register: 'Stock register',
+  customers: 'Customers',
+  outstanding_dues: 'Outstanding dues',
+  sales_history: 'Sales history',
+}
+
+/** Choose which upload's issues to show; the choice lives in the URL (?upload=3). */
+function UploadPicker({ uploads, selected }: { uploads: Upload[]; selected: number | null }) {
+  const navigate = useNavigate()
+  return (
+    <select
+      aria-label="Upload"
+      value={selected ?? ''}
+      onChange={(event) => void navigate(`/issues?upload=${event.target.value}`)}
+      className="h-9 rounded-md border bg-background px-3 text-sm"
+    >
+      {uploads.map((u) => (
+        <option key={u.id} value={u.id}>
+          #{u.id} · {KIND_NAMES[u.kind] ?? u.kind} · {u.filename}
+          {u.status === 'failed' ? ' (failed)' : ''}
+        </option>
+      ))}
+    </select>
   )
 }

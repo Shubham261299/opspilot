@@ -1,196 +1,188 @@
-import { ArrowRight, CircleCheck, FileSpreadsheet, LoaderCircle } from 'lucide-react'
-import { type DragEvent, useRef, useState } from 'react'
+import { ArrowRight, CircleCheck } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
 import { Link } from 'react-router'
 
 import { ErrorAlert } from '@/components/ErrorAlert'
+import { FileDropZone } from '@/components/FileDropZone'
 import { PageHeader } from '@/components/PageHeader'
 import { SeverityBadge } from '@/components/SeverityBadge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { api, ApiError, type StockUploadResult } from '@/lib/api'
-import { formatDate, plural } from '@/lib/format'
-import { SEVERITIES, SEVERITY_MEANING } from '@/lib/issues'
-import { cn } from '@/lib/utils'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  api,
+  ApiError,
+  type CustomersUploadResult,
+  type DuesUploadResult,
+  type SalesUploadResult,
+  type StockUploadResult,
+  type UploadSummary,
+} from '@/lib/api'
+import { formatDate, formatRupees, plural } from '@/lib/format'
+import { SEVERITIES } from '@/lib/issues'
+
+interface FileKind<T extends UploadSummary> {
+  title: string
+  description: string
+  example: string // the sample file's name
+  extension: '.xlsx' | '.csv'
+  send: (file: File) => Promise<T>
+  details: (result: T) => ReactNode // what this kind of file adds to the summary
+}
+
+const STOCK: FileKind<StockUploadResult> = {
+  title: '1 · Stock register',
+  description: 'The godown count. Clean rows become stock counts.',
+  example: 'stock_register.xlsx',
+  extension: '.xlsx',
+  send: api.uploadStockRegister,
+  details: (r) => (
+    <>
+      {plural(r.upload.rows_loaded, 'stock count')} saved, as of {formatDate(r.upload.as_of)}
+      {r.po_notes.length > 0 && ` · ${plural(r.po_notes.length, 'open order')} found in remarks`}
+    </>
+  ),
+}
+
+const CUSTOMERS: FileKind<CustomersUploadResult> = {
+  title: '2 · Customers',
+  description: 'Shops, phone numbers and credit terms. Upload before dues and sales.',
+  example: 'customers.xlsx',
+  extension: '.xlsx',
+  send: api.uploadCustomers,
+  details: (r) => (
+    <>
+      {plural(r.added.length, 'customer')} added · {r.updated.length} updated
+    </>
+  ),
+}
+
+const DUES: FileKind<DuesUploadResult> = {
+  title: '3 · Outstanding dues',
+  description: 'Unpaid bills, for payment reminders and holds.',
+  example: 'outstanding_dues.xlsx',
+  extension: '.xlsx',
+  send: api.uploadDues,
+  details: (r) => (
+    <>
+      {plural(r.bills_loaded, 'unpaid bill')} · {formatRupees(r.total_balance)} outstanding
+    </>
+  ),
+}
+
+const SALES: FileKind<SalesUploadResult> = {
+  title: '4 · Sales history',
+  description: 'The last 90 days of sales, for average daily demand.',
+  example: 'sales_history_90d.csv',
+  extension: '.csv',
+  send: api.uploadSales,
+  details: (r) => (
+    <>
+      {plural(r.lines_loaded, 'sales line')} · last sale {formatDate(r.last_sale)}
+    </>
+  ),
+}
 
 export function UploadPage() {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [dragging, setDragging] = useState(false)
-  const [uploadingName, setUploadingName] = useState<string | null>(null)
-  const [result, setResult] = useState<StockUploadResult | null>(null)
-  const [error, setError] = useState<Error | null>(null)
-
-  async function send(file: File) {
-    if (uploadingName) return // one upload at a time
-    setResult(null)
-    setError(null)
-    if (!file.name.toLowerCase().endsWith('.xlsx')) {
-      setError(new Error(`"${file.name}" is not an Excel .xlsx file.`))
-      return
-    }
-    setUploadingName(file.name)
-    try {
-      setResult(await api.uploadStockRegister(file))
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)))
-    } finally {
-      setUploadingName(null)
-    }
-  }
-
-  function openFilePicker() {
-    inputRef.current?.click()
-  }
-
-  function onDrop(event: DragEvent<HTMLDivElement>) {
-    event.preventDefault() // stop the browser from opening the file itself
-    setDragging(false)
-    const file = event.dataTransfer.files[0]
-    if (file) void send(file)
-  }
-
-  function onDragLeave(event: DragEvent<HTMLDivElement>) {
-    // Moving over a child element also fires "dragleave"; react only when really leaving.
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false)
-  }
-
-  const failedUploadId = error instanceof ApiError ? uploadIdFrom(error.details) : null
-
   return (
     <>
       <PageHeader
-        title="Upload the stock register"
-        description="Drop the godown's Excel stock sheet. Clean rows are saved as stock counts; every problem is listed on the Issues page."
+        title="Upload"
+        description="Drop each file on its card. Clean rows are saved; every problem is listed on the Issues page."
+        actions={
+          <Button asChild>
+            <Link to="/inbox">
+              Go to the Approval Inbox
+              <ArrowRight data-icon="inline-end" />
+            </Link>
+          </Button>
+        }
       />
-
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label="Choose the stock register file"
-        aria-busy={uploadingName !== null}
-        onClick={openFilePicker}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault()
-            openFilePicker()
-          }
-        }}
-        onDragOver={(event) => {
-          event.preventDefault() // required, or the browser won't allow dropping here
-          setDragging(true)
-        }}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-        className={cn(
-          'flex cursor-pointer flex-col items-center gap-3 rounded-xl border-2 border-dashed bg-background px-6 py-14 text-center transition-colors',
-          dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-muted-foreground/40',
-        )}
-      >
-        {uploadingName ? (
-          <LoaderCircle className="size-9 animate-spin text-muted-foreground" aria-hidden />
-        ) : (
-          <FileSpreadsheet className="size-9 text-muted-foreground" aria-hidden />
-        )}
-        <div className="space-y-1">
-          <p className="font-medium">
-            {uploadingName ? `Uploading ${uploadingName}…` : 'Drag and drop stock_register.xlsx here'}
-          </p>
-          <p className="text-sm text-muted-foreground">or click to choose a file · Excel .xlsx, up to 5 MB</p>
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          className="hidden"
-          onClick={(event) => event.stopPropagation()} // don't bubble back to the drop zone
-          onChange={(event) => {
-            const file = event.target.files?.[0]
-            event.target.value = '' // so choosing the same file again still triggers onChange
-            if (file) void send(file)
-          }}
-        />
-      </div>
-
-      <div className="mt-6 space-y-6">
-        {error && (
-          <ErrorAlert error={error} title="The file was not loaded">
-            {failedUploadId !== null && (
-              <p>
-                It is recorded as failed upload #{failedUploadId}.{' '}
-                <Link to={`/issues?upload=${failedUploadId}`}>See it on the Issues page</Link>.
-              </p>
-            )}
-          </ErrorAlert>
-        )}
-        {result && <UploadSummary result={result} />}
+      <div className="grid gap-6 md:grid-cols-2">
+        <UploadCard kind={STOCK} />
+        <UploadCard kind={CUSTOMERS} />
+        <UploadCard kind={DUES} />
+        <UploadCard kind={SALES} />
       </div>
     </>
   )
 }
 
-function UploadSummary({ result }: { result: StockUploadResult }) {
-  const { upload, issues_by_severity: counts, po_notes: poNotes } = result
-  const totalIssues = counts.error + counts.warning + counts.info
+function UploadCard<T extends UploadSummary>({ kind }: { kind: FileKind<T> }) {
+  const [sending, setSending] = useState<string | null>(null)
+  const [result, setResult] = useState<T | null>(null)
+  const [error, setError] = useState<Error | null>(null)
+
+  async function send(file: File) {
+    if (sending) return // one upload at a time per card
+    setResult(null)
+    setError(null)
+    if (!file.name.toLowerCase().endsWith(kind.extension)) {
+      setError(new Error(`"${file.name}" is not a ${kind.extension} file.`))
+      return
+    }
+    setSending(file.name)
+    try {
+      setResult(await kind.send(file))
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setSending(null)
+    }
+  }
+
+  const failedUploadId = error instanceof ApiError ? uploadIdFrom(error.details) : null
+  const accept = kind.extension === '.csv' ? '.csv,text/csv' : '.xlsx'
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CircleCheck className="size-5 text-emerald-600" aria-hidden />
-          {upload.filename} processed
-        </CardTitle>
-        <CardDescription>
-          Upload #{upload.id} · stock count of {formatDate(upload.as_of)}
-        </CardDescription>
+        <CardTitle>{kind.title}</CardTitle>
+        <CardDescription>{kind.description}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Item rows read" value={upload.rows_read} />
-          <Stat label="Stock counts saved" value={upload.rows_loaded} />
-          <Stat label="Open orders found" value={poNotes.length} />
-          <Stat label="Issues listed" value={totalIssues} />
-        </dl>
-        <ul className="space-y-1.5 text-sm">
-          {SEVERITIES.map((severity) => (
-            <li key={severity} className="flex items-center gap-2">
-              <SeverityBadge severity={severity} count={counts[severity]} className="w-24" />
-              <span className="text-muted-foreground">{SEVERITY_MEANING[severity]}</span>
-            </li>
-          ))}
-        </ul>
-        {poNotes.length > 0 && (
-          <div className="space-y-1.5">
-            <h3 className="text-sm font-medium">Open purchase orders found in remarks</h3>
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {poNotes.map((note) => (
-                <li key={note.source_row}>
-                  Row {note.source_row}: {note.qty} × {note.sku}
-                  {note.supplier_code && ` from ${note.supplier_code}`}
-                  {note.ordered_on && `, ordered ${formatDate(note.ordered_on)}`} (“{note.note}”)
-                </li>
-              ))}
-            </ul>
-          </div>
+      <CardContent className="space-y-4">
+        <FileDropZone
+          label={`Drop ${kind.example} here`}
+          hint={`or click to choose · ${kind.extension}, up to 5 MB`}
+          accept={accept}
+          busyLabel={sending && `Uploading ${sending}…`}
+          onFile={(file) => void send(file)}
+        />
+        {error && (
+          <ErrorAlert error={error} title="The file was not loaded">
+            {failedUploadId !== null && (
+              <p>
+                Recorded as failed upload #{failedUploadId}.{' '}
+                <Link to={`/issues?upload=${failedUploadId}`}>See why</Link>.
+              </p>
+            )}
+          </ErrorAlert>
         )}
+        {result && <Summary result={result} details={kind.details(result)} />}
       </CardContent>
-      <CardFooter className="gap-2">
-        <Button asChild>
-          <Link to={`/issues?upload=${upload.id}`}>
-            Review {plural(totalIssues, 'issue')}
-            <ArrowRight data-icon="inline-end" />
-          </Link>
-        </Button>
-        <Button asChild variant="outline">
-          <Link to="/stock">View stock</Link>
-        </Button>
-      </CardFooter>
     </Card>
   )
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Summary({ result, details }: { result: UploadSummary; details: ReactNode }) {
+  const counts = result.issues_by_severity
+  const total = counts.error + counts.warning + counts.info
   return (
-    <div className="rounded-lg border bg-muted/30 p-3">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-2xl font-semibold tabular-nums">{value}</dd>
+    <div className="space-y-3 rounded-lg border bg-muted/30 p-4 text-sm">
+      <p className="flex items-center gap-2 font-medium">
+        <CircleCheck className="size-4 text-emerald-600" aria-hidden />
+        {result.upload.filename} processed (upload #{result.upload.id})
+      </p>
+      <p className="text-muted-foreground">{details}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        {SEVERITIES.map((severity) => (
+          <SeverityBadge key={severity} severity={severity} count={counts[severity]} />
+        ))}
+        {total > 0 && (
+          <Link to={`/issues?upload=${result.upload.id}`} className="ml-auto text-sm underline">
+            Review {plural(total, 'issue')}
+          </Link>
+        )}
+      </div>
     </div>
   )
 }

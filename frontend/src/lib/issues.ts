@@ -34,6 +34,22 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   supplier_short_name: 'Supplier short name',
   open_po_note: 'Open purchase order in remarks',
   other_sheet: 'Other sheets not imported',
+  duplicate_customer: 'Likely duplicate customer',
+  missing_customer_code: 'No party code',
+  missing_shop_name: 'No shop name',
+  invalid_credit_terms: 'Missing or invalid credit terms',
+  unknown_customer: 'Unknown customer',
+  invalid_bill: 'Unreadable bill',
+  invalid_sale: 'Unreadable sale',
+  invalid_phone: 'Invalid mobile number',
+  balance_mismatch: "Balance doesn't add up",
+  future_bill_date: 'Bill dated in the future',
+  amount_mismatch: "Amount doesn't add up",
+  phones_normalised: 'Mobile number formats normalised',
+  party_by_name: 'Parties written by shop name',
+  dates_as_text: 'Dates typed as text',
+  blank_received: 'Blank received amounts',
+  paid_bill: 'Fully paid bills skipped',
 }
 
 export function issueTypeLabel(issueType: string): string {
