@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from app.domain.dates import find_date, infer_date
+from app.domain.dates import find_date, infer_date, parse_day_first
 
 REFERENCE = date(2026, 9, 24)
 
@@ -49,3 +49,21 @@ def test_find_date_reads_day_first_dates_in_text(text: str, expected: date) -> N
 @pytest.mark.parametrize("text", ["SHARMA TRADERS - STOCK REGISTER", "", "rate 1150"])
 def test_find_date_returns_none_without_a_date(text: str) -> None:
     assert find_date(text, REFERENCE) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("15-08-2026", date(2026, 8, 15)),
+        (" 15/8/26 ", date(2026, 8, 15)),
+        ("15.08.2026", date(2026, 8, 15)),
+        ("15/8", date(2026, 8, 15)),
+    ],
+)
+def test_a_date_typed_as_text_is_read_day_first(text: str, expected: date) -> None:
+    assert parse_day_first(text, REFERENCE) == expected
+
+
+@pytest.mark.parametrize("text", ["31-02-2026", "on 15/8", "2026-08-15", "soon"])
+def test_text_that_is_not_only_a_valid_date_is_not_a_date(text: str) -> None:
+    assert parse_day_first(text, REFERENCE) is None

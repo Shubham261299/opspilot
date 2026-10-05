@@ -15,6 +15,7 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
+    Index,
     MetaData,
     Numeric,
     String,
@@ -22,6 +23,7 @@ from sqlalchemy import (
     UniqueConstraint,
     false,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -86,13 +88,19 @@ class Upload(Base):
     """One uploaded file and what happened to it."""
 
     __tablename__ = "uploads"
-    __table_args__ = (CheckConstraint("status IN ('processed', 'failed')", name="status_valid"),)
+    __table_args__ = (
+        CheckConstraint("status IN ('processed', 'failed')", name="status_valid"),
+        CheckConstraint(
+            "kind IN ('stock_register', 'customers', 'outstanding_dues', 'sales_history')",
+            name="kind_valid",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    kind: Mapped[str]  # "stock_register" for now
+    kind: Mapped[str]
     filename: Mapped[str]
     status: Mapped[str]
-    as_of: Mapped[date | None]  # the count date found inside the file
+    as_of: Mapped[date | None]  # the date the file describes (count date, last sale, …)
     rows_read: Mapped[int] = mapped_column(server_default="0")
     rows_loaded: Mapped[int] = mapped_column(server_default="0")
     error: Mapped[str | None]  # why a failed upload failed
@@ -151,6 +159,7 @@ class Issue(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), index=True)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
     source_file: Mapped[str]
     source_row: Mapped[int | None]  # None = about the whole file
     issue_type: Mapped[str]  # e.g. "negative_qty", "duplicate_row"
@@ -158,6 +167,162 @@ class Issue(Base):
     detail: Mapped[str]
     raw: Mapped[dict[str, Any] | None]  # the original cell values
     resolved: Mapped[bool] = mapped_column(server_default=false())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class Customer(Base):
+    """A shop that buys from Sharma Traders. Loaded from the customers file; `on_hold` is
+    only ever changed by an approved proposal."""
+
+    __tablename__ = "customers"
+    __table_args__ = (
+        CheckConstraint("credit_limit >= 0", name="credit_limit_not_negative"),
+        CheckConstraint("credit_days >= 0", name="credit_days_not_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(10), unique=True)  # "CUS001"
+    shop_name: Mapped[str]
+    contact_person: Mapped[str | None]
+    phone: Mapped[str | None]  # normalised: "+919895822412"
+    area: Mapped[str | None]
+    credit_limit: Mapped[Decimal]
+    credit_days: Mapped[int]
+    on_hold: Mapped[bool] = mapped_column(server_default=false())
+    hold_reason: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class SalesLine(Base):
+    """One line of the sales history. Each upload is a full export; the latest one is used."""
+
+    __tablename__ = "sales_lines"
+    __table_args__ = (CheckConstraint("qty > 0", name="qty_positive"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), index=True)
+    sale_date: Mapped[date]
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    qty: Mapped[int]
+    unit_price: Mapped[Decimal]
+    amount: Mapped[Decimal]
+
+
+class CustomerBill(Base):
+    """An unpaid (or part-paid) bill from the outstanding dues file, as of one upload."""
+
+    __tablename__ = "customer_bills"
+    __table_args__ = (
+        UniqueConstraint("upload_id", "bill_no"),
+        CheckConstraint("amount >= 0 AND received >= 0", name="amounts_not_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"))
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    bill_no: Mapped[str] = mapped_column(String(20))  # "ST/5402"
+    bill_date: Mapped[date]
+    amount: Mapped[Decimal]
+    received: Mapped[Decimal] = mapped_column(server_default="0")
+    balance: Mapped[Decimal]
+    source_row: Mapped[int]
+
+
+class Proposal(Base):
+    """An action the system suggests. Nothing happens until a human approves it.
+
+    status: pending -> approved | rejected, or superseded when newer data replaces it.
+    """
+
+    __tablename__ = "proposals"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('reorder', 'payment_reminder', 'hold_orders')", name="kind_valid"
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'superseded')", name="status_valid"
+        ),
+        # A proposal is about exactly one product or exactly one customer.
+        CheckConstraint(
+            "(product_id IS NULL) <> (customer_id IS NULL)", name="exactly_one_subject"
+        ),
+        # At most one pending proposal of each kind per product / per customer.
+        Index(
+            "uq_proposals_pending_product",
+            "kind",
+            "product_id",
+            unique=True,
+            postgresql_where=text("status = 'pending' AND product_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_proposals_pending_customer",
+            "kind",
+            "customer_id",
+            unique=True,
+            postgresql_where=text("status = 'pending' AND customer_id IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str]
+    status: Mapped[str] = mapped_column(server_default="pending")
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
+    numbers: Mapped[dict[str, Any]]  # the calculated figures, e.g. reorder point and qty
+    basis: Mapped[dict[str, Any]]  # what it was calculated from: upload ids and "today"
+    reason: Mapped[str]  # plain-language explanation shown to the owner
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    decided_at: Mapped[datetime | None]
+    decided_by: Mapped[str | None]
+    decision_note: Mapped[str | None]
+
+
+class PurchaseOrder(Base):
+    """A purchase order created by approving a reorder proposal (never by the system alone)."""
+
+    __tablename__ = "purchase_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('approved', 'sent', 'received', 'cancelled')", name="status_valid"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"), index=True)
+    proposal_id: Mapped[int] = mapped_column(ForeignKey("proposals.id"), unique=True)
+    status: Mapped[str] = mapped_column(server_default="approved")
+    created_by: Mapped[str]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class PurchaseOrderLine(Base):
+    __tablename__ = "purchase_order_lines"
+    __table_args__ = (CheckConstraint("qty > 0", name="qty_positive"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_orders.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    qty: Mapped[int]
+    unit_cost: Mapped[Decimal]
+
+
+class PaymentReminder(Base):
+    """A reminder created by approving a payment proposal. Sending comes with WhatsApp later."""
+
+    __tablename__ = "payment_reminders"
+    __table_args__ = (
+        CheckConstraint("status IN ('ready', 'sent', 'cancelled')", name="status_valid"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), index=True)
+    proposal_id: Mapped[int] = mapped_column(ForeignKey("proposals.id"), unique=True)
+    message: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(server_default="ready")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 

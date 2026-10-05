@@ -27,6 +27,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-opspilot}:${POSTGRES_PASSWORD:-opspilot}@db:5432/${POSTGRES_DB:-opspilot}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # The sample data describes 24 Sep 2026, so the demo treats that day as "today"
+      # (overdue days and the 90-day sales window depend on it). Set APP_TODAY to change it.
+      APP_TODAY: ${APP_TODAY:-2026-09-24}
     ports:
       - "8000:8000"
     depends_on:

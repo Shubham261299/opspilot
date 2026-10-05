@@ -29,6 +29,15 @@ def infer_date(day: int, month: int, year: int | None, reference: date) -> date 
     return None
 
 
+def parse_day_first(text: str, reference: date) -> date | None:
+    """A cell that is only a date written as text: "15-08-2026", "15/8/26", "15/8"."""
+    match = _DAY_FIRST_DATE.fullmatch(text.strip())
+    if match is None:
+        return None
+    day, month, year = match.groups()
+    return infer_date(int(day), int(month), int(year) if year else None, reference)
+
+
 def find_date(text: str, reference: date) -> date | None:
     """The first valid day-first date in `text` ("Updated on 24/9 evening" -> 24 Sep)."""
     for match in _DAY_FIRST_DATE.finditer(text):

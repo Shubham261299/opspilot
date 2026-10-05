@@ -1,14 +1,34 @@
 """Read queries used by the API and the importers. Routers call these; they hold no SQL."""
 
 from dataclasses import dataclass
+from datetime import date
+from decimal import Decimal
+from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.models import Issue, OpenPoNote, Product, StockLevel, Supplier, Upload
+from app.db.models import (
+    Customer,
+    CustomerBill,
+    Issue,
+    OpenPoNote,
+    PaymentReminder,
+    Product,
+    Proposal,
+    PurchaseOrder,
+    PurchaseOrderLine,
+    StockLevel,
+    Supplier,
+    Upload,
+)
 from app.domain.catalog import Catalog, CatalogProduct, CatalogSupplier
 
+# Upload kinds (uploads.kind)
 STOCK_REGISTER = "stock_register"
+CUSTOMERS = "customers"
+OUTSTANDING_DUES = "outstanding_dues"
+SALES_HISTORY = "sales_history"
 
 
 @dataclass(frozen=True)
@@ -46,18 +66,61 @@ async def load_reference_data(session: AsyncSession) -> ReferenceData:
     )
 
 
-async def current_stock_upload(session: AsyncSession) -> Upload | None:
-    """The stock count that is "current": the processed upload with the latest count date.
+async def current_upload(session: AsyncSession, kind: str) -> Upload | None:
+    """The "current" file of one kind: the processed upload with the latest as-of date.
 
-    Uploading an older file later doesn't replace a newer count (docs/decisions.md, 010).
+    Uploading an older file later doesn't replace a newer one (docs/decisions.md, 010).
     """
     stmt = (
         select(Upload)
-        .where(Upload.kind == STOCK_REGISTER, Upload.status == "processed")
+        .where(Upload.kind == kind, Upload.status == "processed")
         .order_by(Upload.as_of.desc().nulls_last(), Upload.created_at.desc(), Upload.id.desc())
         .limit(1)
     )
     return await session.scalar(stmt)
+
+
+async def current_stock_upload(session: AsyncSession) -> Upload | None:
+    return await current_upload(session, STOCK_REGISTER)
+
+
+async def all_customers(session: AsyncSession) -> list[Customer]:
+    return list((await session.scalars(select(Customer).order_by(Customer.code))).all())
+
+
+@dataclass(frozen=True)
+class CustomerDues:
+    customer: Customer
+    balance: Decimal  # total unpaid in the current dues file
+    open_bills: int
+    oldest_bill_date: date | None
+
+
+async def customers_with_dues(
+    session: AsyncSession, dues_upload_id: int | None
+) -> list[CustomerDues]:
+    """Every customer with the total of their unpaid bills in one dues upload."""
+    bills = (
+        select(
+            CustomerBill.customer_id,
+            func.sum(CustomerBill.balance).label("balance"),
+            func.count().label("open_bills"),
+            func.min(CustomerBill.bill_date).label("oldest"),
+        )
+        .where(CustomerBill.upload_id == dues_upload_id)
+        .group_by(CustomerBill.customer_id)
+        .subquery()
+    )
+    stmt = (
+        select(Customer, bills.c.balance, bills.c.open_bills, bills.c.oldest)
+        .outerjoin(bills, bills.c.customer_id == Customer.id)
+        .order_by(Customer.code)
+    )
+    rows = (await session.execute(stmt)).all()
+    return [
+        CustomerDues(customer, balance or Decimal(0), open_bills or 0, oldest)
+        for customer, balance, open_bills, oldest in rows
+    ]
 
 
 async def get_upload(session: AsyncSession, upload_id: int) -> Upload | None:
@@ -82,10 +145,17 @@ class ProductStock:
 
 async def products_with_stock(session: AsyncSession, upload_id: int | None) -> list[ProductStock]:
     """Every product with its count, quantity on order and open issues from one stock upload."""
+    # On order = PO notes in the stock sheet + purchase orders approved in OpsPilot.
+    noted = select(OpenPoNote.product_id, OpenPoNote.qty).where(OpenPoNote.upload_id == upload_id)
+    approved = (
+        select(PurchaseOrderLine.product_id, PurchaseOrderLine.qty)
+        .join(PurchaseOrder)
+        .where(PurchaseOrder.status.in_(("approved", "sent")))
+    )
+    both = noted.union_all(approved).subquery()
     on_order = (
-        select(OpenPoNote.product_id, func.sum(OpenPoNote.qty).label("qty"))
-        .where(OpenPoNote.upload_id == upload_id)
-        .group_by(OpenPoNote.product_id)
+        select(both.c.product_id, func.sum(both.c.qty).label("qty"))
+        .group_by(both.c.product_id)
         .subquery()
     )
     open_issues = (
@@ -123,18 +193,104 @@ async def products_with_stock(session: AsyncSession, upload_id: int | None) -> l
 
 
 @dataclass(frozen=True)
-class IssueWithProduct:
+class IssueWithSubject:
     issue: Issue
     sku: str | None
     product_name: str | None
+    customer_code: str | None
+    customer_name: str | None
 
 
-async def issues_for_upload(session: AsyncSession, upload_id: int) -> list[IssueWithProduct]:
+async def issues_for_upload(session: AsyncSession, upload_id: int) -> list[IssueWithSubject]:
     stmt = (
-        select(Issue, Product.sku, Product.name)
+        select(Issue, Product.sku, Product.name, Customer.code, Customer.shop_name)
         .outerjoin(Product, Product.id == Issue.product_id)
+        .outerjoin(Customer, Customer.id == Issue.customer_id)
         .where(Issue.upload_id == upload_id)
         .order_by(Issue.id)
     )
     rows = (await session.execute(stmt)).all()
-    return [IssueWithProduct(issue, sku, name) for issue, sku, name in rows]
+    return [IssueWithSubject(*row) for row in rows]
+
+
+async def recent_uploads(session: AsyncSession, limit: int = 50) -> list[Upload]:
+    stmt = select(Upload).order_by(Upload.created_at.desc(), Upload.id.desc()).limit(limit)
+    return list((await session.scalars(stmt)).all())
+
+
+@dataclass(frozen=True)
+class ProposalView:
+    proposal: Proposal
+    sku: str | None
+    product_name: str | None
+    customer_code: str | None
+    customer_name: str | None
+    purchase_order_id: int | None
+    payment_reminder_id: int | None
+    reminder_message: str | None
+
+
+def _proposal_views() -> Select[Any]:
+    """A proposal with its product or customer and what approving it created."""
+    return (
+        select(
+            Proposal,
+            Product.sku,
+            Product.name,
+            Customer.code,
+            Customer.shop_name,
+            PurchaseOrder.id,
+            PaymentReminder.id,
+            PaymentReminder.message,
+        )
+        .outerjoin(Product, Product.id == Proposal.product_id)
+        .outerjoin(Customer, Customer.id == Proposal.customer_id)
+        .outerjoin(PurchaseOrder, PurchaseOrder.proposal_id == Proposal.id)
+        .outerjoin(PaymentReminder, PaymentReminder.proposal_id == Proposal.id)
+    )
+
+
+async def list_proposals(session: AsyncSession, status: str) -> list[ProposalView]:
+    """Proposals with one status. Pending: oldest first (a queue); decided: newest first."""
+    order = (
+        (Proposal.kind, Proposal.id)
+        if status == "pending"
+        else (Proposal.decided_at.desc().nulls_last(), Proposal.id.desc())
+    )
+    stmt = _proposal_views().where(Proposal.status == status).order_by(*order).limit(500)
+    return [ProposalView(*row) for row in (await session.execute(stmt)).all()]
+
+
+async def get_proposal_view(session: AsyncSession, proposal_id: int) -> ProposalView | None:
+    row = (await session.execute(_proposal_views().where(Proposal.id == proposal_id))).first()
+    return ProposalView(*row) if row is not None else None
+
+
+@dataclass(frozen=True)
+class PurchaseOrderView:
+    order: PurchaseOrder
+    supplier: Supplier
+    lines: list[tuple[PurchaseOrderLine, Product]]
+
+
+async def list_purchase_orders(session: AsyncSession) -> list[PurchaseOrderView]:
+    orders = (
+        await session.execute(
+            select(PurchaseOrder, Supplier)
+            .join(Supplier)
+            .order_by(PurchaseOrder.created_at.desc(), PurchaseOrder.id.desc())
+            .limit(200)
+        )
+    ).all()
+    lines = (
+        await session.execute(
+            select(PurchaseOrderLine, Product)
+            .join(Product)
+            .where(PurchaseOrderLine.purchase_order_id.in_([o.id for o, _ in orders]))
+            .order_by(PurchaseOrderLine.id)
+        )
+    ).all()
+    by_order: dict[int, list[tuple[PurchaseOrderLine, Product]]] = {}
+    for line, product in lines:
+        by_order.setdefault(line.purchase_order_id, []).append((line, product))
+    return [PurchaseOrderView(o, sup, by_order.get(o.id, [])) for o, sup in orders]

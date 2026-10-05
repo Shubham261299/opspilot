@@ -14,6 +14,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime, time
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from typing import Any
 
@@ -84,6 +85,40 @@ def json_safe(value: Any) -> Any:
 
 def column_letter(col: int) -> str:
     return get_column_letter(col + 1)  # column index 0 -> "A"
+
+
+def raw_cells(header: Header, row: SheetRow) -> dict[str, Any]:
+    """The row's non-blank cells exactly as typed, keyed by column title (for issue records)."""
+    return {
+        header.labels.get(col, column_letter(col)): json_safe(row.original[col])
+        for col, _ in row.filled()
+    }
+
+
+def cells_by_field(header: Header, row: SheetRow) -> dict[str, Any]:
+    """The row's cleaned values by field name ("qty", "code", ...)."""
+    return {
+        field: row.values[col] for field, col in header.columns.items() if col < len(row.values)
+    }
+
+
+def parse_money(value: Any) -> Decimal | None:
+    """1150, "1,150", "₹ 1150", "Rs. 1150" -> Decimal("1150"); anything else -> None."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return Decimal(str(value))
+    text = re.sub(r"^(₹|rs\.?|inr)\s*", "", str(value), flags=re.IGNORECASE).replace(",", "")
+    try:
+        amount = Decimal(text.strip())
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() else None
+
+
+def rupees(amount: Decimal) -> str:
+    """Decimal("6500") -> "₹6500.00"."""
+    return f"₹{amount.quantize(Decimal('0.01'))}"
 
 
 def read_workbook(content: bytes) -> list[Sheet]:

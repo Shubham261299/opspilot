@@ -16,6 +16,18 @@ def normalise_name(text: str) -> str:
     return " ".join(text.casefold().split())
 
 
+def names_almost_equal(a: str, b: str) -> bool:
+    """Equal after ignoring case, spaces and a trailing plural "s" ("Electrical" ~ "Electricals").
+
+    Only used to *point out* a likely duplicate or typo to a human, never to match by itself.
+    """
+
+    def key(name: str) -> str:
+        return " ".join(word.rstrip("s") for word in normalise_name(name).split())
+
+    return key(a) == key(b)
+
+
 @dataclass(frozen=True)
 class ProductMatch:
     sku: str

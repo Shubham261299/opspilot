@@ -21,6 +21,13 @@ class IssueType(StrEnum):
     INVALID_QTY = "invalid_qty"
     UNKNOWN_UNIT = "unknown_unit"
     UNIT_MISMATCH = "unit_mismatch"
+    DUPLICATE_CUSTOMER = "duplicate_customer"
+    MISSING_CUSTOMER_CODE = "missing_customer_code"
+    MISSING_SHOP_NAME = "missing_shop_name"
+    INVALID_CREDIT_TERMS = "invalid_credit_terms"
+    UNKNOWN_CUSTOMER = "unknown_customer"
+    INVALID_BILL = "invalid_bill"
+    INVALID_SALE = "invalid_sale"
     # warning
     BLANK_CODE = "blank_code"
     DUPLICATE_ROW = "duplicate_row"
@@ -33,6 +40,10 @@ class IssueType(StrEnum):
     UNCLEAR_PO_REMARK = "unclear_po_remark"
     MISSING_FROM_REGISTER = "missing_from_register"
     COUNT_DATE_MISSING = "count_date_missing"
+    INVALID_PHONE = "invalid_phone"
+    BALANCE_MISMATCH = "balance_mismatch"
+    FUTURE_BILL_DATE = "future_bill_date"
+    AMOUNT_MISMATCH = "amount_mismatch"
     # info
     SKIPPED_ROW = "skipped_row"
     UNITS_NORMALISED = "units_normalised"
@@ -41,6 +52,11 @@ class IssueType(StrEnum):
     SUPPLIER_SHORT_NAME = "supplier_short_name"
     OPEN_PO_NOTE = "open_po_note"
     OTHER_SHEET = "other_sheet"
+    PHONES_NORMALISED = "phones_normalised"
+    PARTY_BY_NAME = "party_by_name"
+    DATES_AS_TEXT = "dates_as_text"
+    BLANK_RECEIVED = "blank_received"
+    PAID_BILL = "paid_bill"
 
     @property
     def severity(self) -> Severity:
@@ -56,6 +72,13 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.INVALID_QTY,
             IssueType.UNKNOWN_UNIT,
             IssueType.UNIT_MISMATCH,
+            IssueType.DUPLICATE_CUSTOMER,
+            IssueType.MISSING_CUSTOMER_CODE,
+            IssueType.MISSING_SHOP_NAME,
+            IssueType.INVALID_CREDIT_TERMS,
+            IssueType.UNKNOWN_CUSTOMER,
+            IssueType.INVALID_BILL,
+            IssueType.INVALID_SALE,
         ),
         "error",
     ),
@@ -72,6 +95,10 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.UNCLEAR_PO_REMARK,
             IssueType.MISSING_FROM_REGISTER,
             IssueType.COUNT_DATE_MISSING,
+            IssueType.INVALID_PHONE,
+            IssueType.BALANCE_MISMATCH,
+            IssueType.FUTURE_BILL_DATE,
+            IssueType.AMOUNT_MISMATCH,
         ),
         "warning",
     ),
@@ -84,6 +111,11 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.SUPPLIER_SHORT_NAME,
             IssueType.OPEN_PO_NOTE,
             IssueType.OTHER_SHEET,
+            IssueType.PHONES_NORMALISED,
+            IssueType.PARTY_BY_NAME,
+            IssueType.DATES_AS_TEXT,
+            IssueType.BLANK_RECEIVED,
+            IssueType.PAID_BILL,
         ),
         "info",
     ),
@@ -97,6 +129,7 @@ class IssueRecord:
     source_row: int | None = None  # row number in the file; None = about the whole file
     sku: str | None = None  # the product it concerns, when known
     raw: dict[str, Any] | None = None  # the original cell values
+    customer_code: str | None = None  # the customer it concerns, when known
 
     @property
     def severity(self) -> Severity:

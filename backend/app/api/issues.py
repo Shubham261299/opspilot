@@ -38,6 +38,8 @@ async def list_issues(
                 detail=row.issue.detail,
                 sku=row.sku,
                 product_name=row.product_name,
+                customer_code=row.customer_code,
+                customer_name=row.customer_name,
                 raw=row.issue.raw,
                 resolved=row.issue.resolved,
             )

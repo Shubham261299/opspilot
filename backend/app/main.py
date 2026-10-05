@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 
-from app.api import health, issues, products, uploads
+from app.api import customers, health, issues, products, proposals, uploads
 from app.api.errors import error_response, register_error_handlers
 from app.config import get_settings
 from app.db.session import get_engine
@@ -29,6 +29,8 @@ app.include_router(health.router)
 app.include_router(uploads.router)
 app.include_router(products.router)
 app.include_router(issues.router)
+app.include_router(customers.router)
+app.include_router(proposals.router)
 
 
 @app.middleware("http")

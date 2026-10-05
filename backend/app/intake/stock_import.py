@@ -7,16 +7,16 @@ that can't be read at all is still recorded, as a 'failed' upload with its own a
 
 import asyncio
 import logging
-from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.audit import audit_entry
-from app.db.models import Issue, OpenPoNote, StockLevel, Upload
+from app.db.models import OpenPoNote, StockLevel, Upload
 from app.db.queries import STOCK_REGISTER, load_reference_data
 from app.intake.errors import IntakeError, UploadRejected
+from app.intake.importing import issue_rows, save_failed_upload, severity_counts
 from app.intake.stock_register import StockRegisterResult, parse_stock_register
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,9 @@ async def import_stock_register(
         # pandas work is CPU-heavy; a worker thread keeps the server free for other requests.
         result = await asyncio.to_thread(parse_stock_register, content, reference.catalog, today)
     except IntakeError as exc:
-        upload = await _save_failed_upload(session, filename, exc, actor)
+        upload = await save_failed_upload(
+            session, kind=STOCK_REGISTER, filename=filename, error=exc, actor=actor
+        )
         raise UploadRejected(exc.code, exc.message, upload.id) from exc
 
     upload = Upload(
@@ -75,19 +77,7 @@ async def import_stock_register(
         )
         for note in result.po_notes
     )
-    session.add_all(
-        Issue(
-            upload_id=upload.id,
-            product_id=product_ids.get(issue.sku or ""),
-            source_file=filename,
-            source_row=issue.source_row,
-            issue_type=issue.issue_type.value,
-            severity=issue.severity,
-            detail=issue.detail,
-            raw=issue.raw,
-        )
-        for issue in result.issues
-    )
+    session.add_all(issue_rows(upload.id, filename, result.issues, product_ids=product_ids))
     summary = summarise(upload, result)
     session.add(
         audit_entry(
@@ -120,27 +110,5 @@ def summarise(upload: Upload, result: StockRegisterResult) -> dict[str, object]:
         "rows_read": result.rows_read,
         "rows_loaded": len(result.stock_rows),
         "po_notes": len(result.po_notes),
-        "issues": dict(Counter(issue.severity for issue in result.issues)),
+        "issues": severity_counts(result.issues),
     }
-
-
-async def _save_failed_upload(
-    session: AsyncSession, filename: str, error: IntakeError, actor: str
-) -> Upload:
-    upload = Upload(kind=STOCK_REGISTER, filename=filename, status="failed", error=error.message)
-    session.add(upload)
-    await session.flush()
-    session.add(
-        audit_entry(
-            actor=actor,
-            action=AUDIT_ACTION,
-            entity_type="upload",
-            entity_id=upload.id,
-            after={"filename": filename, "status": "failed", "error": error.code},
-        )
-    )
-    await session.commit()
-    logger.warning(
-        "stock register rejected", extra={"upload_id": upload.id, "error_code": error.code}
-    )
-    return upload

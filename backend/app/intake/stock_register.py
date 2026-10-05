@@ -10,7 +10,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any
 
 from app.domain.catalog import Catalog, CatalogProduct
@@ -27,6 +27,8 @@ from app.intake.excel import (
     json_safe,
     read_workbook,
 )
+from app.intake.excel import parse_money as _parse_money
+from app.intake.excel import rupees as _rupees
 from app.intake.issues import IssueRecord, IssueType
 
 # Column titles (compared after normalise_label) that mean each field.
@@ -644,24 +646,6 @@ def _is_name_of(name: str, product: CatalogProduct) -> bool:
     return key == normalise_name(product.name) or key in {
         normalise_name(alias) for alias in product.aliases
     }
-
-
-def _parse_money(value: Any) -> Decimal | None:
-    """1150, "1,150", "₹ 1150", "Rs. 1150" -> Decimal("1150"); anything else -> None."""
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, int | float):
-        return Decimal(str(value))
-    text = re.sub(r"^(₹|rs\.?|inr)\s*", "", str(value), flags=re.IGNORECASE).replace(",", "")
-    try:
-        amount = Decimal(text.strip())
-    except InvalidOperation:
-        return None
-    return amount if amount.is_finite() else None
-
-
-def _rupees(amount: Decimal) -> str:
-    return f"₹{amount.quantize(Decimal('0.01'))}"
 
 
 def _plural(unit: str) -> str:

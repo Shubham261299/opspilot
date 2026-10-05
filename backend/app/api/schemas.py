@@ -20,7 +20,9 @@ class UploadOut(BaseModel):
     kind: str
     filename: str
     status: Literal["processed", "failed"]
-    as_of: date | None = Field(description="Count date read from the file")
+    as_of: date | None = Field(
+        description="The date the file describes: count date, upload date for dues, last sale"
+    )
     rows_read: int
     rows_loaded: int
     error: str | None
@@ -36,11 +38,33 @@ class PoNoteOut(BaseModel):
     source_row: int
 
 
-class StockUploadOut(BaseModel):
+class UploadSummaryOut(BaseModel):
     upload: UploadOut
     issues_by_severity: dict[Severity, int]
     issues_by_type: dict[str, int]
+
+
+class StockUploadOut(UploadSummaryOut):
     po_notes: list[PoNoteOut]
+
+
+class CustomersUploadOut(UploadSummaryOut):
+    added: list[str] = Field(description="Codes of customers added by this file")
+    updated: list[str] = Field(description="Codes of customers whose details changed")
+
+
+class DuesUploadOut(UploadSummaryOut):
+    bills_loaded: int
+    total_balance: Decimal
+
+
+class SalesUploadOut(UploadSummaryOut):
+    lines_loaded: int
+    last_sale: date | None
+
+
+class UploadsOut(BaseModel):
+    items: list[UploadOut]
 
 
 class SupplierOut(BaseModel):
@@ -80,6 +104,8 @@ class IssueOut(BaseModel):
     detail: str
     sku: str | None
     product_name: str | None
+    customer_code: str | None
+    customer_name: str | None
     raw: dict[str, Any] | None = Field(description="The original cell values")
     resolved: bool
 
@@ -87,3 +113,92 @@ class IssueOut(BaseModel):
 class IssuesOut(BaseModel):
     upload: UploadOut | None
     items: list[IssueOut]
+
+
+class CustomerOut(BaseModel):
+    code: str
+    shop_name: str
+    contact_person: str | None
+    phone: str | None
+    area: str | None
+    credit_limit: Decimal
+    credit_days: int
+    on_hold: bool
+    hold_reason: str | None
+    balance: Decimal = Field(description="Total unpaid in the current dues file")
+    open_bills: int
+    oldest_bill_date: date | None
+
+
+class CustomersOut(BaseModel):
+    dues_upload_id: int | None = Field(description="The dues upload the balances come from")
+    dues_as_of: date | None
+    items: list[CustomerOut]
+
+
+ProposalKind = Literal["reorder", "payment_reminder", "hold_orders"]
+ProposalStatus = Literal["pending", "approved", "rejected", "superseded"]
+
+
+class ProposalSubjectOut(BaseModel):
+    type: Literal["product", "customer"]
+    code: str
+    name: str
+
+
+class ProposalOut(BaseModel):
+    id: int
+    kind: ProposalKind
+    status: ProposalStatus
+    subject: ProposalSubjectOut
+    numbers: dict[str, Any] = Field(description="The calculated figures behind the proposal")
+    reason: str
+    basis: dict[str, Any] = Field(description="What it was calculated from: uploads and today")
+    created_at: datetime
+    decided_at: datetime | None
+    decided_by: str | None
+    decision_note: str | None
+    purchase_order_id: int | None = Field(description="Created when a reorder is approved")
+    payment_reminder_id: int | None = Field(description="Created when a reminder is approved")
+    reminder_message: str | None
+
+
+class ProposalsOut(BaseModel):
+    items: list[ProposalOut]
+
+
+class RunChecksOut(BaseModel):
+    created: int
+    unchanged: int
+    superseded: int
+    already_decided: int = Field(description="Not proposed again: decided before, same numbers")
+    pending: int = Field(description="Proposals now waiting for a decision")
+    not_checked: list[str] = Field(description="Checks that couldn't run, and why")
+
+
+class DecisionIn(BaseModel):
+    note: str | None = Field(default=None, max_length=500, description="Why, in a few words")
+
+
+class PurchaseOrderLineOut(BaseModel):
+    sku: str
+    name: str
+    qty: int
+    unit: str
+    unit_cost: Decimal
+    amount: Decimal
+
+
+class PurchaseOrderOut(BaseModel):
+    id: int
+    status: str
+    supplier: SupplierOut
+    proposal_id: int
+    created_by: str
+    created_at: datetime
+    lines: list[PurchaseOrderLineOut]
+    total: Decimal
+
+
+class PurchaseOrdersOut(BaseModel):
+    items: list[PurchaseOrderOut]
