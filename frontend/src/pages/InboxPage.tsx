@@ -1,4 +1,4 @@
-import { Check, CircleCheck, Info, LoaderCircle, RefreshCw, X } from 'lucide-react'
+import { Check, CircleCheck, Info, LoaderCircle, RefreshCw, Sparkles, X } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 
@@ -16,6 +16,7 @@ import { formatDate, formatDateTime, formatRupees, plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const KINDS: { kind: ProposalKind; title: string; approveLabel: string }[] = [
+  { kind: 'confirm_order', title: 'Customer orders (WhatsApp)', approveLabel: 'Confirm order' },
   { kind: 'reorder', title: 'Reorders', approveLabel: 'Approve purchase order' },
   { kind: 'hold_orders', title: 'Hold new orders', approveLabel: 'Approve hold' },
   { kind: 'payment_reminder', title: 'Payment reminders', approveLabel: 'Approve reminder' },
@@ -163,7 +164,9 @@ function DecisionDone({ proposal }: { proposal: Proposal }) {
   const what =
     proposal.status === 'rejected'
       ? 'Rejected. Nothing was changed.'
-      : proposal.purchase_order_id
+      : proposal.kind === 'confirm_order'
+        ? 'Confirmed: the order is ready to dispatch.'
+        : proposal.purchase_order_id
         ? `Approved: purchase order #${proposal.purchase_order_id} created.`
         : proposal.payment_reminder_id
           ? 'Approved: the reminder is ready to send.'
@@ -204,6 +207,7 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
   }
 
   const n = proposal.numbers
+  const notReady = proposal.kind === 'confirm_order' && !n.ready
   return (
     <Card className="gap-4">
       <CardHeader>
@@ -216,13 +220,32 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
             </Badge>
           )}
         </CardTitle>
-        <CardDescription>{proposal.reason}</CardDescription>
+        <Explanation proposal={proposal} />
       </CardHeader>
-      <CardContent>
-        {proposal.kind === 'reorder' ? <ReorderNumbers proposal={proposal} /> : <CreditNumbers proposal={proposal} />}
+      <CardContent className="space-y-3">
+        {proposal.kind === 'reorder' && <ReorderNumbers proposal={proposal} />}
+        {(proposal.kind === 'payment_reminder' || proposal.kind === 'hold_orders') && (
+          <CreditNumbers proposal={proposal} />
+        )}
+        {proposal.kind === 'confirm_order' && <OrderLines proposal={proposal} />}
+        {proposal.draft_message && (
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <p className="mb-1 text-xs text-muted-foreground">Message to the customer, sent when approved:</p>
+            <p>{proposal.draft_message}</p>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
         {error && <ErrorAlert error={error} title="Not saved" />}
+        {notReady && (
+          <p className="text-sm text-muted-foreground">
+            Some lines need a product before the order can be confirmed.{' '}
+            <Link to={`/orders#order-${proposal.order_id}`} className="underline">
+              Fix them on the Orders page
+            </Link>
+            , or reject it.
+          </p>
+        )}
         <Input
           value={note}
           onChange={(event) => setNote(event.target.value)}
@@ -231,7 +254,7 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
           maxLength={500}
         />
         <div className="flex gap-2">
-          <Button onClick={() => void decide('approve')} disabled={busy !== null} className="flex-1">
+          <Button onClick={() => void decide('approve')} disabled={busy !== null || notReady} className="flex-1">
             {busy === 'approve' ? <LoaderCircle className="animate-spin" /> : <Check />}
             {approveLabel}
           </Button>
@@ -242,6 +265,73 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
         </div>
       </CardFooter>
     </Card>
+  )
+}
+
+/** The language model's wording when it passed the checks; the code's calculation is always there. */
+function Explanation({ proposal }: { proposal: Proposal }) {
+  if (proposal.explained_by !== 'llm' || !proposal.explanation) {
+    return (
+      <CardDescription>
+        {proposal.reason}
+        {proposal.explained_by === null && (
+          <span className="mt-1 flex items-center gap-1 text-xs">
+            <LoaderCircle className="size-3 animate-spin" aria-hidden /> The language model is writing an
+            explanation…
+          </span>
+        )}
+      </CardDescription>
+    )
+  }
+  return (
+    <div className="space-y-1 text-sm">
+      <p>{proposal.explanation}</p>
+      <p className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Sparkles className="size-3" aria-hidden /> Written by AI · every number checked against the calculation
+      </p>
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">The calculation</summary>
+        <p className="mt-1">{proposal.reason}</p>
+      </details>
+    </div>
+  )
+}
+
+function OrderLines({ proposal }: { proposal: Proposal }) {
+  const n = proposal.numbers
+  return (
+    <div className="space-y-2 text-sm">
+      <ul className="divide-y rounded-md border">
+        {(n.lines ?? []).map((line) => (
+          <li key={line.line_id} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
+            <span>
+              <span className="tabular-nums font-medium">{line.qty}</span>{' '}
+              {line.sku ? (
+                <>
+                  {line.name} <span className="font-mono text-xs text-muted-foreground">{line.sku}</span>
+                </>
+              ) : (
+                <span className="text-destructive">“{line.written}”: no product yet</span>
+              )}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {line.matched_on === 'model' ? 'matched by AI, check it' : line.sku ? `“${line.written}”` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {n.est_value && (
+        <p className="text-muted-foreground">About {formatRupees(n.est_value)} at list prices.</p>
+      )}
+      {n.customer_on_hold && (
+        <Badge variant="destructive">Customer on hold: dispatch needs the owner (policy 2.4)</Badge>
+      )}
+      {(n.unclear ?? []).map((question) => (
+        <p key={question} className="text-amber-900 dark:text-amber-200">
+          Ask the customer: {question}
+        </p>
+      ))}
+    </div>
   )
 }
 

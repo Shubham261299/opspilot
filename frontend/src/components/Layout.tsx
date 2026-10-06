@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 const LINKS = [
   { to: '/upload', label: 'Upload' },
   { to: '/inbox', label: 'Approval Inbox' },
+  { to: '/orders', label: 'Orders' },
   { to: '/stock', label: 'Stock' },
   { to: '/customers', label: 'Customers' },
   { to: '/issues', label: 'Issues' },

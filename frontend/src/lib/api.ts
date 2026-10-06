@@ -10,7 +10,7 @@ export interface Upload {
   id: number
   kind: string
   filename: string
-  status: 'processed' | 'failed'
+  status: 'processing' | 'processed' | 'failed' // processing: a chat is being read
   as_of: string | null // count date, "2026-09-24"
   rows_read: number
   rows_loaded: number
@@ -53,6 +53,11 @@ export interface SalesUploadResult extends UploadSummary {
   last_sale: string | null
 }
 
+export interface UploadAccepted {
+  upload: Upload
+  message: string
+}
+
 export interface UploadList {
   items: Upload[]
 }
@@ -78,7 +83,7 @@ export interface CustomerList {
   items: Customer[]
 }
 
-export type ProposalKind = 'reorder' | 'payment_reminder' | 'hold_orders'
+export type ProposalKind = 'reorder' | 'payment_reminder' | 'hold_orders' | 'confirm_order'
 export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'superseded'
 
 export interface OverdueBill {
@@ -112,13 +117,33 @@ export interface ProposalNumbers {
   over_limit?: boolean
   max_days_overdue?: number
   overdue_bills?: OverdueBill[]
+  // confirm_order
+  sender?: string
+  customer_code?: string | null
+  lines?: ProposedOrderLine[]
+  est_value?: string
+  unclear?: string[]
+  customer_on_hold?: boolean
+  ready?: boolean // every line has a product and the sender is a known customer
+}
+
+export interface ProposedOrderLine {
+  line_id: number
+  written: string
+  qty: number
+  unit_written: string | null
+  sku: string | null
+  name: string | null
+  unit: string | null
+  matched_on: string | null
+  amount: string | null
 }
 
 export interface Proposal {
   id: number
   kind: ProposalKind
   status: ProposalStatus
-  subject: { type: 'product' | 'customer'; code: string; name: string }
+  subject: { type: 'product' | 'customer' | 'order'; code: string; name: string }
   numbers: ProposalNumbers
   reason: string
   basis: Record<string, unknown>
@@ -129,6 +154,54 @@ export interface Proposal {
   purchase_order_id: number | null
   payment_reminder_id: number | null
   reminder_message: string | null
+  order_id: number | null
+  explanation: string | null // written by the language model, checked by code
+  explained_by: 'llm' | 'template' | null // null: still being written
+  draft_message: string | null // a reminder's message to the customer
+}
+
+export interface OrderLine {
+  id: number
+  written: string // the product words as the customer wrote them
+  qty: number
+  unit_written: string | null
+  sku: string | null // null: not matched yet
+  name: string | null
+  matched_on: string | null // name, alias, same words, model or owner
+}
+
+export type OrderStatus = 'awaiting_confirmation' | 'confirmed' | 'rejected'
+
+export interface Order {
+  id: number
+  upload_id: number
+  status: OrderStatus
+  sender: string
+  customer_code: string | null
+  customer_name: string | null
+  first_sent_at: string
+  source_lines: number[]
+  unclear: string[]
+  lines: OrderLine[]
+  proposal_id: number | null
+}
+
+export interface OrderList {
+  items: Order[]
+}
+
+export interface Enquiry {
+  id: number
+  upload_id: number
+  sender: string
+  customer_code: string | null
+  text: string
+  source_line: number
+  created_at: string
+}
+
+export interface EnquiryList {
+  items: Enquiry[]
 }
 
 export interface ProposalList {
@@ -242,7 +315,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export type UploadKind = 'stock' | 'customers' | 'dues' | 'sales'
+export type UploadKind = 'stock' | 'customers' | 'dues' | 'sales' | 'whatsapp'
 
 function upload<T>(kind: UploadKind, file: File): Promise<T> {
   const form = new FormData()
@@ -250,9 +323,9 @@ function upload<T>(kind: UploadKind, file: File): Promise<T> {
   return request(`/uploads/${kind}`, { method: 'POST', body: form })
 }
 
-function postJson<T>(path: string, body?: unknown): Promise<T> {
+function sendJson<T>(method: 'POST' | 'PATCH', path: string, body?: unknown): Promise<T> {
   return request(path, {
-    method: 'POST',
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
@@ -263,6 +336,24 @@ export const api = {
   uploadCustomers: (file: File) => upload<CustomersUploadResult>('customers', file),
   uploadDues: (file: File) => upload<DuesUploadResult>('dues', file),
   uploadSales: (file: File) => upload<SalesUploadResult>('sales', file),
+  uploadWhatsapp: (file: File) => upload<UploadAccepted>('whatsapp', file),
+  upload(id: number): Promise<Upload> {
+    return request(`/uploads/${id}`)
+  },
+  orders(status?: OrderStatus): Promise<OrderList> {
+    return request(status ? `/orders?status=${status}` : '/orders')
+  },
+  /** Fix a line: choose its product (sku), correct its quantity, or remove it. */
+  changeOrderLine(
+    orderId: number,
+    lineId: number,
+    change: { sku?: string; qty?: number; remove?: boolean },
+  ): Promise<Order> {
+    return sendJson('PATCH', `/orders/${orderId}/lines/${lineId}`, change)
+  },
+  enquiries(): Promise<EnquiryList> {
+    return request('/enquiries')
+  },
   uploads(): Promise<UploadList> {
     return request('/uploads')
   },
@@ -279,12 +370,12 @@ export const api = {
     return request(`/proposals?status=${status}`)
   },
   runChecks(): Promise<RunChecksResult> {
-    return postJson('/proposals/run')
+    return sendJson('POST', '/proposals/run')
   },
   approve(id: number, note?: string): Promise<Proposal> {
-    return postJson(`/proposals/${id}/approve`, { note: note || null })
+    return sendJson('POST', `/proposals/${id}/approve`, { note: note || null })
   },
   reject(id: number, note?: string): Promise<Proposal> {
-    return postJson(`/proposals/${id}/reject`, { note: note || null })
+    return sendJson('POST', `/proposals/${id}/reject`, { note: note || null })
   },
 }

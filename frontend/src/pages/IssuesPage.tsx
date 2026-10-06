@@ -156,6 +156,7 @@ const KIND_NAMES: Record<string, string> = {
   customers: 'Customers',
   outstanding_dues: 'Outstanding dues',
   sales_history: 'Sales history',
+  whatsapp_chat: 'WhatsApp chat',
 }
 
 /** Choose which upload's issues to show; the choice lives in the URL (?upload=3). */

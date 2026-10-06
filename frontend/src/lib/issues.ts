@@ -50,6 +50,11 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   dates_as_text: 'Dates typed as text',
   blank_received: 'Blank received amounts',
   paid_bill: 'Fully paid bills skipped',
+  thread_not_read: 'Messages the language model could not read',
+  unmatched_product: 'Product not matched',
+  needs_clarification: 'Ask the customer',
+  product_matched_by_llm: 'Product matched by the language model',
+  unit_written_differently: 'Unit written differently',
 }
 
 export function issueTypeLabel(issueType: string): string {

@@ -4,6 +4,7 @@ import { Layout } from '@/components/Layout'
 import { CustomersPage } from '@/pages/CustomersPage'
 import { InboxPage } from '@/pages/InboxPage'
 import { IssuesPage } from '@/pages/IssuesPage'
+import { OrdersPage } from '@/pages/OrdersPage'
 import { StockPage } from '@/pages/StockPage'
 import { UploadPage } from '@/pages/UploadPage'
 
@@ -16,6 +17,7 @@ export default function App() {
           <Route index element={<Navigate to="/upload" replace />} />
           <Route path="upload" element={<UploadPage />} />
           <Route path="inbox" element={<InboxPage />} />
+          <Route path="orders" element={<OrdersPage />} />
           <Route path="stock" element={<StockPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="issues" element={<IssuesPage />} />
