@@ -15,7 +15,8 @@ permissions:
 jobs:
   backend:
     name: Backend
-    runs-on: ubuntu-latest # a brand-new Linux virtual machine, lent by GitHub for this run
+    runs-on: ubuntu-24.04 # a brand-new Linux virtual machine, lent by GitHub for this run; pinned
+    # (not ubuntu-latest) so an OS upgrade happens when we choose, not under us
     defaults:
       run:
         working-directory: backend # every `run:` step below starts in backend/
@@ -69,7 +70,7 @@ jobs:
   # No `needs:` between the two jobs, so they run at the same time, each on its own fresh machine.
   frontend:
     name: Frontend
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend # every `run:` step below starts in frontend/

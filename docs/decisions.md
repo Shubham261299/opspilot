@@ -347,6 +347,91 @@ describes 24 Sep 2026; a week later every bill would be seven days more overdue.
 without it the API uses the real date.
 **Why:** The demo gives the policy's answers for its own data whenever it is run.
 
+## 029 · One door to the language model: structured output, one repair, then an error (2026-10-06)
+
+**Context:** From week 3 the app calls a language model. Its answers can be malformed, and the
+model will change (Ollama now, a hosted model for the public demo).
+**Options:** Call a provider's SDK where needed · one function in `app/llm/` through LiteLLM.
+**Choice:** `complete_structured(messages, Schema)` in `app/llm/client.py` is the only way to
+reach a model. LiteLLM passes the Pydantic schema as the provider's structured-output option;
+the answer is validated; a wrong answer is sent back once with the exact validation error
+(the repair retry); a second failure, or an unreachable model, raises `LlmError`, and every
+caller has a fallback (report an issue, or use the template). Temperature 0. Prompts are never
+logged (they hold customers' messages), only purpose, model, attempts and time. LiteLLM is
+told to use its bundled price list rather than download one at start-up. Tests use a fake
+model, so CI needs no LLM.
+**Why:** Switching model is a setting, malformed output can't reach the data, and a missing model
+degrades the app instead of breaking it.
+
+## 030 · WhatsApp orders: they wait for confirmation, and the owner can fix any line (2026-10-06)
+
+**Context:** An order read from a chat can be wrong (an unclear line, a misread quantity) and
+confirming it commits stock to a customer.
+**Options:** Save parsed orders as confirmed · make each one a proposal to confirm.
+**Choice:** Each parsed order is stored as `awaiting_confirmation` with a `confirm_order`
+proposal (one per order, enforced by a partial unique index). Approving refuses with 409 while a
+line has no product or the sender is unknown, saying what to fix. The owner can choose a line's
+product, correct its quantity or remove it; each fix is audited and refreshes the proposal.
+Enquiries and questions to ask the customer (a "[photo]" request, policy 3.2) are kept
+separately. The model reads a chat in a background task (minutes on a laptop CPU): the upload
+answers 202, is polled, is marked `failed` with nothing half-saved if anything breaks, and an
+identical file is refused by its SHA-256. "Run checks" only manages its own kinds, so it never
+supersedes an order.
+**Why:** Nothing reaches a customer without a human (rule 2), and a model's mistake costs a click,
+not a wrong delivery. The quantity fix exists because a real run read "bend 200" as 1 × "bend 200".
+
+## 031 · Approval agents in LangGraph: explain, wait at interrupt(), apply (2026-10-06)
+
+**Context:** The stack names LangGraph with `interrupt()` for approvals; proposals must wait for a
+human, possibly for days, across restarts.
+**Options:** Keep approvals as plain endpoints · one LangGraph graph per proposal, persisted.
+**Choice:** Each proposal gets a graph `explain → wait → apply`. *Explain* asks the model to word
+it (and to draft a reminder's message); *wait* calls `interrupt()`, so the graph's state is saved
+by LangGraph's Postgres checkpointer, in its own `langgraph` schema that Alembic never sees;
+Approve/Reject resume it, and *apply* runs the existing transactional approve/reject code (row
+lock, effect, audit). If apply is refused ("order not ready") the graph loops back to wait.
+Agents start in the background after "Run checks" and after a WhatsApp upload; proposals are
+claimed with `FOR UPDATE SKIP LOCKED` so two starters never double up. A decision made before an
+agent reaches *wait* goes straight to the same approve/reject code. psycopg (the checkpointer's
+driver) needs a selector event loop on Windows, set for local tests; Docker and CI are Linux.
+**Why:** A paused proposal survives a restart (tested: a new runner resumed one), and the
+approval path has one transactional core whichever way it is reached.
+
+## 032 · The model's words are checked: no new numbers, no other customers (2026-10-06)
+
+**Context:** Rule 3: code calculates, the model explains. A fluent explanation with a wrong
+amount is worse than none.
+**Options:** Trust the prompt · check the text in code.
+**Choice:** Before an explanation or a reminder draft is stored, `domain/text_numbers.py` checks
+that every number in it already appears in the computed figures or the template reason (compared
+by value: ₹1,78,200 = 178200.00), and a reminder may not name another customer (policy 2.5).
+Failing text is discarded and the code's template is shown instead; the UI labels model text
+"Written by AI · every number checked".
+**Why:** Measured on the first real run (qwen2.5:14b, 34 proposals, median 28 s each): 33 passed,
+and the one rejected was a reminder quoting ₹17,500, a sum the model invented (the customer's
+bills were ₹13,000, ₹13,500 and ₹4,000). The check caught exactly the failure rule 3 warns about.
+
+## 033 · Reading WhatsApp orders: code first, the model second, and measured (2026-10-06)
+
+**Context:** The chat is Hinglish, with corrections in later messages, orders split over
+lines, a photo reference and enquiries. The answer key expects 16 orders and 4 non-orders.
+**Options:** Ask the model for SKUs directly · code splits and matches, the model reads and
+picks only what code can't match.
+**Choice:** Code splits the export into one thread per customer (shop replies included for
+context) and the model returns order lines as written, with corrections applied. Code matches
+products: exact name or alias, then the same words in another order (plurals tolerated), then
+the product words without a quantity the model copied in ("regulator 10", qty 10). Only the
+rest goes to the model to pick from the catalogue; code checks every SKU it returns, and an
+unsure pick, no pick, an unknown SKU or a pick for words it wasn't asked about stays unmatched
+for the owner. Model: qwen2.5:14b by default in Docker, qwen2.5:7b for quick development runs.
+**Why:** Measured with `scripts/score_parser.py` on the final code (results in
+`scripts/results/`): 14b 15/16 orders fully right, 44/45 lines, 436 s; 7b 14/16, 44/45, 215 s;
+both with 0 wrong products or quantities and 4/4 non-orders. The first prompt scored 12/16 and
+40/45 with 7b; general prompt rules and small, tested code rules brought it up. Caveat: the
+prompt was improved on this same sample, as there is no second chat to test on, so these are
+in-sample numbers. The same model can also read an ambiguous line differently between runs
+("bend 200"), which is why doubtful lines go to review instead of into the order.
+
 ---
 
 ## Ideas
