@@ -39,11 +39,12 @@ def catalog() -> Catalog:
     )
 
 
-def pytest_asyncio_loop_factories(
-    config: pytest.Config, item: pytest.Item
-) -> Mapping[str, Callable[[], asyncio.AbstractEventLoop]] | None:
-    """psycopg (used by LangGraph's checkpointer) can't run on Windows' default event loop;
-    the selector loop works everywhere. On Linux (Docker, CI) the default is kept."""
-    if sys.platform == "win32":
+if sys.platform == "win32":
+    # psycopg (used by LangGraph's checkpointer) can't run on Windows' default event loop, so
+    # tests there use the selector loop. The hook only exists on Windows: pytest-asyncio
+    # requires it to return a factory whenever it is defined, and Linux (Docker, CI) needs none.
+
+    def pytest_asyncio_loop_factories(
+        config: pytest.Config, item: pytest.Item
+    ) -> Mapping[str, Callable[[], asyncio.AbstractEventLoop]]:
         return {"selector": asyncio.SelectorEventLoop}
-    return None
