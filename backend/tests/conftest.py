@@ -1,3 +1,6 @@
+import asyncio
+import sys
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 import pytest
@@ -34,3 +37,13 @@ def catalog() -> Catalog:
         ],
         suppliers=[CatalogSupplier(code=s.code, name=s.name) for s in suppliers],
     )
+
+
+def pytest_asyncio_loop_factories(
+    config: pytest.Config, item: pytest.Item
+) -> Mapping[str, Callable[[], asyncio.AbstractEventLoop]] | None:
+    """psycopg (used by LangGraph's checkpointer) can't run on Windows' default event loop;
+    the selector loop works everywhere. On Linux (Docker, CI) the default is kept."""
+    if sys.platform == "win32":
+        return {"selector": asyncio.SelectorEventLoop}
+    return None

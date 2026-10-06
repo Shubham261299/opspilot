@@ -5,6 +5,7 @@ spaces) and points to exactly one product or supplier. Anything else returns Non
 the caller reports an issue so a human decides.
 """
 
+import re
 from dataclasses import dataclass
 from typing import Literal
 
@@ -31,7 +32,7 @@ def names_almost_equal(a: str, b: str) -> bool:
 @dataclass(frozen=True)
 class ProductMatch:
     sku: str
-    matched_on: Literal["name", "alias"]
+    matched_on: Literal["name", "alias", "same words"]
 
 
 def match_product_by_name(name: str, catalog: Catalog) -> ProductMatch | None:
@@ -50,6 +51,32 @@ def match_product_by_name(name: str, catalog: Catalog) -> ProductMatch | None:
     if len(by_alias) == 1:
         return ProductMatch(by_alias[0], "alias")
     return None
+
+
+def words(text: str) -> frozenset[str]:
+    """Numbers and words, ignoring order, case, spacing and a plural "s":
+    "Plate 3m" -> {"3", "m", "plate"}; "clips" -> {"clip"}."""
+    return frozenset(
+        token[:-1] if len(token) > 3 and token.endswith("s") and token.isalpha() else token
+        for token in re.findall(r"\d+(?:\.\d+)?|[a-z]+", text.casefold())
+    )
+
+
+def match_product_by_words(text: str, catalog: Catalog) -> ProductMatch | None:
+    """An exact name or alias first; failing that, the one product whose name or an alias
+    has exactly the same words in another order ("flood 50w" = alias "50w flood")."""
+    exact = match_product_by_name(text, catalog)
+    if exact is not None:
+        return exact
+    key = words(text)
+    if not key:
+        return None
+    same = {
+        p.sku
+        for p in catalog.products.values()
+        if any(words(label) == key for label in (p.name, *p.aliases))
+    }
+    return ProductMatch(same.pop(), "same words") if len(same) == 1 else None
 
 
 @dataclass(frozen=True)

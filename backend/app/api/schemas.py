@@ -19,7 +19,7 @@ class UploadOut(BaseModel):
     id: int
     kind: str
     filename: str
-    status: Literal["processed", "failed"]
+    status: Literal["processing", "processed", "failed"]
     as_of: date | None = Field(
         description="The date the file describes: count date, upload date for dues, last sale"
     )
@@ -61,6 +61,11 @@ class DuesUploadOut(UploadSummaryOut):
 class SalesUploadOut(UploadSummaryOut):
     lines_loaded: int
     last_sale: date | None
+
+
+class UploadAcceptedOut(BaseModel):
+    upload: UploadOut
+    message: str
 
 
 class UploadsOut(BaseModel):
@@ -136,13 +141,13 @@ class CustomersOut(BaseModel):
     items: list[CustomerOut]
 
 
-ProposalKind = Literal["reorder", "payment_reminder", "hold_orders"]
+ProposalKind = Literal["reorder", "payment_reminder", "hold_orders", "confirm_order"]
 ProposalStatus = Literal["pending", "approved", "rejected", "superseded"]
 
 
 class ProposalSubjectOut(BaseModel):
-    type: Literal["product", "customer"]
-    code: str
+    type: Literal["product", "customer", "order"]
+    code: str  # SKU, party code, or for an order the party code ("?" if the sender is unknown)
     name: str
 
 
@@ -161,6 +166,12 @@ class ProposalOut(BaseModel):
     purchase_order_id: int | None = Field(description="Created when a reorder is approved")
     payment_reminder_id: int | None = Field(description="Created when a reminder is approved")
     reminder_message: str | None
+    order_id: int | None = Field(description="For a confirm_order proposal: the order")
+    explanation: str | None = Field(
+        description="Written by the language model and checked by code; null until then"
+    )
+    explained_by: Literal["llm", "template"] | None
+    draft_message: str | None = Field(description="A reminder's message for the customer")
 
 
 class ProposalsOut(BaseModel):
@@ -202,3 +213,51 @@ class PurchaseOrderOut(BaseModel):
 
 class PurchaseOrdersOut(BaseModel):
     items: list[PurchaseOrderOut]
+
+
+class OrderLineOut(BaseModel):
+    id: int
+    written: str = Field(description="The product words as the customer wrote them")
+    qty: int
+    unit_written: str | None
+    sku: str | None = Field(description="null: not matched yet; the owner must choose")
+    name: str | None
+    matched_on: str | None = Field(description="name, alias, same words, model or owner")
+
+
+class OrderOut(BaseModel):
+    id: int
+    upload_id: int
+    status: Literal["awaiting_confirmation", "confirmed", "rejected"]
+    sender: str
+    customer_code: str | None
+    customer_name: str | None
+    first_sent_at: datetime
+    source_lines: list[int]
+    unclear: list[str]
+    lines: list[OrderLineOut]
+    proposal_id: int | None
+
+
+class OrdersOut(BaseModel):
+    items: list[OrderOut]
+
+
+class OrderLineChangeIn(BaseModel):
+    sku: str | None = Field(default=None, description="The product this line is, e.g. ST-0021")
+    qty: int | None = Field(default=None, gt=0, description="The correct quantity")
+    remove: bool = Field(default=False, description="Remove the line instead")
+
+
+class EnquiryOut(BaseModel):
+    id: int
+    upload_id: int
+    sender: str
+    customer_code: str | None
+    text: str
+    source_line: int
+    created_at: datetime
+
+
+class EnquiriesOut(BaseModel):
+    items: list[EnquiryOut]

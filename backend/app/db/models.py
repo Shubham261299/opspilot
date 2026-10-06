@@ -16,6 +16,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     MetaData,
     Numeric,
     String,
@@ -89,9 +90,11 @@ class Upload(Base):
 
     __tablename__ = "uploads"
     __table_args__ = (
-        CheckConstraint("status IN ('processed', 'failed')", name="status_valid"),
+        # processing: a WhatsApp chat is being read by the language model in the background
+        CheckConstraint("status IN ('processing', 'processed', 'failed')", name="status_valid"),
         CheckConstraint(
-            "kind IN ('stock_register', 'customers', 'outstanding_dues', 'sales_history')",
+            "kind IN ('stock_register', 'customers', 'outstanding_dues', 'sales_history', "
+            "'whatsapp_chat')",
             name="kind_valid",
         ),
     )
@@ -104,6 +107,7 @@ class Upload(Base):
     rows_read: Mapped[int] = mapped_column(server_default="0")
     rows_loaded: Mapped[int] = mapped_column(server_default="0")
     error: Mapped[str | None]  # why a failed upload failed
+    content_sha256: Mapped[str | None] = mapped_column(String(64), index=True)  # spots re-uploads
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
@@ -239,14 +243,15 @@ class Proposal(Base):
     __tablename__ = "proposals"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('reorder', 'payment_reminder', 'hold_orders')", name="kind_valid"
+            "kind IN ('reorder', 'payment_reminder', 'hold_orders', 'confirm_order')",
+            name="kind_valid",
         ),
         CheckConstraint(
             "status IN ('pending', 'approved', 'rejected', 'superseded')", name="status_valid"
         ),
-        # A proposal is about exactly one product or exactly one customer.
+        # A proposal is about exactly one product, one customer or one customer order.
         CheckConstraint(
-            "(product_id IS NULL) <> (customer_id IS NULL)", name="exactly_one_subject"
+            "num_nonnulls(product_id, customer_id, order_id) = 1", name="exactly_one_subject"
         ),
         # At most one pending proposal of each kind per product / per customer.
         Index(
@@ -263,6 +268,12 @@ class Proposal(Base):
             unique=True,
             postgresql_where=text("status = 'pending' AND customer_id IS NOT NULL"),
         ),
+        Index(
+            "uq_proposals_pending_order",
+            "order_id",
+            unique=True,
+            postgresql_where=text("status = 'pending' AND order_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -270,9 +281,17 @@ class Proposal(Base):
     status: Mapped[str] = mapped_column(server_default="pending")
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), index=True)
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
+    order_id: Mapped[int | None] = mapped_column(ForeignKey("customer_orders.id"), index=True)
     numbers: Mapped[dict[str, Any]]  # the calculated figures, e.g. reorder point and qty
     basis: Mapped[dict[str, Any]]  # what it was calculated from: upload ids and "today"
-    reason: Mapped[str]  # plain-language explanation shown to the owner
+    reason: Mapped[str]  # plain-language explanation built by code from the numbers
+    # Written by the language model in the background, checked by code (rule 3); NULL until
+    # then, or when the check failed and the reason above is shown instead.
+    explanation: Mapped[str | None] = mapped_column(Text)
+    explained_by: Mapped[str | None]  # "llm" or "template"
+    draft_message: Mapped[str | None] = mapped_column(Text)  # a reminder's text for the customer
+    # The LangGraph thread that waits for the human decision (agents/approval.py)
+    agent_thread_id: Mapped[str | None] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     decided_at: Mapped[datetime | None]
     decided_by: Mapped[str | None]
@@ -323,6 +342,58 @@ class PaymentReminder(Base):
     proposal_id: Mapped[int] = mapped_column(ForeignKey("proposals.id"), unique=True)
     message: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(server_default="ready")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class CustomerOrder(Base):
+    """An order read from a WhatsApp chat. It waits for a human to confirm it (a proposal)."""
+
+    __tablename__ = "customer_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('awaiting_confirmation', 'confirmed', 'rejected')", name="status_valid"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
+    sender: Mapped[str]  # the WhatsApp name, as in the chat
+    first_sent_at: Mapped[datetime]
+    source_lines: Mapped[list[int]] = mapped_column(ARRAY(Integer))  # lines in the export
+    unclear: Mapped[list[str]] = mapped_column(server_default="{}")  # to ask the customer about
+    status: Mapped[str] = mapped_column(server_default="awaiting_confirmation")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class CustomerOrderLine(Base):
+    __tablename__ = "customer_order_lines"
+    __table_args__ = (CheckConstraint("qty > 0", name="qty_positive"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(
+        ForeignKey("customer_orders.id", ondelete="CASCADE"), index=True
+    )
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), index=True)
+    written: Mapped[str]  # the product words as the customer wrote them
+    qty: Mapped[int]
+    unit_written: Mapped[str | None]
+    # name / alias / same words (code), model (the LLM picked it), owner (chosen by a human);
+    # NULL with no product = not matched yet
+    matched_on: Mapped[str | None]
+
+
+class Enquiry(Base):
+    """A question from a customer (price, stock, products we may not sell): not an order."""
+
+    __tablename__ = "enquiries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), index=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
+    sender: Mapped[str]
+    text: Mapped[str] = mapped_column(Text)
+    source_line: Mapped[int]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 

@@ -1,0 +1,191 @@
+{
+  "summary": {
+    "model": "ollama_chat/qwen2.5:14b",
+    "run_at": "2026-10-06T10:19:35",
+    "seconds": 436,
+    "model_calls": 21,
+    "orders_fully_right": 15,
+    "orders_expected": 16,
+    "lines_exact": 44,
+    "lines_expected": 45,
+    "lines_wrong_qty": 0,
+    "lines_missing": 1,
+    "lines_extra": 0,
+    "lines_sent_to_review": 1,
+    "non_orders_right": 4,
+    "non_orders_expected": 4,
+    "orders_for_unexpected_senders": [],
+    "issues_by_type": {
+      "needs_clarification": 2,
+      "product_matched_by_llm": 2,
+      "unit_written_differently": 1,
+      "unmatched_product": 1
+    }
+  },
+  "orders": [
+    {
+      "customer": "Ramesh Electricals",
+      "all_right": true,
+      "exact": 3,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Om Sai Hardware",
+      "all_right": true,
+      "exact": 3,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "New Light House",
+      "all_right": true,
+      "exact": 3,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Balaji Electricals",
+      "all_right": true,
+      "exact": 3,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Kalpana Lighting",
+      "all_right": true,
+      "exact": 2,
+      "expected": 2,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Mahalaxmi Traders",
+      "all_right": false,
+      "exact": 2,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [
+        "ST-0028"
+      ],
+      "extra": [],
+      "unmatched": [
+        "bend 200"
+      ]
+    },
+    {
+      "customer": "Royal Hardware",
+      "all_right": true,
+      "exact": 1,
+      "expected": 1,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Deshmukh Electric Works",
+      "all_right": true,
+      "exact": 3,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Siddhivinayak Electric",
+      "all_right": true,
+      "exact": 3,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Pooja Electricals",
+      "all_right": true,
+      "exact": 4,
+      "expected": 4,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "City Electricals",
+      "all_right": true,
+      "exact": 4,
+      "expected": 4,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Swami Samarth Traders",
+      "all_right": true,
+      "exact": 2,
+      "expected": 2,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Patil Electric Mart",
+      "all_right": true,
+      "exact": 3,
+      "expected": 3,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Gajanan Electricals",
+      "all_right": true,
+      "exact": 2,
+      "expected": 2,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Tulja Electricals",
+      "all_right": true,
+      "exact": 4,
+      "expected": 4,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    },
+    {
+      "customer": "Krishna Light Centre",
+      "all_right": true,
+      "exact": 2,
+      "expected": 2,
+      "wrong_qty": [],
+      "missing": [],
+      "extra": [],
+      "unmatched": []
+    }
+  ]
+}

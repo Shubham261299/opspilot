@@ -28,6 +28,7 @@ class IssueType(StrEnum):
     UNKNOWN_CUSTOMER = "unknown_customer"
     INVALID_BILL = "invalid_bill"
     INVALID_SALE = "invalid_sale"
+    THREAD_NOT_READ = "thread_not_read"
     # warning
     BLANK_CODE = "blank_code"
     DUPLICATE_ROW = "duplicate_row"
@@ -44,6 +45,8 @@ class IssueType(StrEnum):
     BALANCE_MISMATCH = "balance_mismatch"
     FUTURE_BILL_DATE = "future_bill_date"
     AMOUNT_MISMATCH = "amount_mismatch"
+    UNMATCHED_PRODUCT = "unmatched_product"
+    NEEDS_CLARIFICATION = "needs_clarification"
     # info
     SKIPPED_ROW = "skipped_row"
     UNITS_NORMALISED = "units_normalised"
@@ -57,6 +60,8 @@ class IssueType(StrEnum):
     DATES_AS_TEXT = "dates_as_text"
     BLANK_RECEIVED = "blank_received"
     PAID_BILL = "paid_bill"
+    PRODUCT_MATCHED_BY_LLM = "product_matched_by_llm"
+    UNIT_WRITTEN_DIFFERENTLY = "unit_written_differently"
 
     @property
     def severity(self) -> Severity:
@@ -79,6 +84,7 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.UNKNOWN_CUSTOMER,
             IssueType.INVALID_BILL,
             IssueType.INVALID_SALE,
+            IssueType.THREAD_NOT_READ,
         ),
         "error",
     ),
@@ -99,6 +105,8 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.BALANCE_MISMATCH,
             IssueType.FUTURE_BILL_DATE,
             IssueType.AMOUNT_MISMATCH,
+            IssueType.UNMATCHED_PRODUCT,
+            IssueType.NEEDS_CLARIFICATION,
         ),
         "warning",
     ),
@@ -116,6 +124,8 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.DATES_AS_TEXT,
             IssueType.BLANK_RECEIVED,
             IssueType.PAID_BILL,
+            IssueType.PRODUCT_MATCHED_BY_LLM,
+            IssueType.UNIT_WRITTEN_DIFFERENTLY,
         ),
         "info",
     ),

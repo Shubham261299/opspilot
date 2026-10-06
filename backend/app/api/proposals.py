@@ -1,8 +1,9 @@
 from typing import Annotated, cast
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, BackgroundTasks, Query
 
-from app.api.deps import SessionDep, TodayDep
+from app.agents.approval import Action, AgentRunner
+from app.api.deps import AgentsDep, SessionDep, TodayDep
 from app.api.errors import ApiError
 from app.api.schemas import (
     DecisionIn,
@@ -26,6 +27,7 @@ from app.db.queries import (
 )
 from app.proposals import decisions
 from app.proposals.checks import run_checks
+from app.proposals.orders import OrderNotReady
 
 router = APIRouter(tags=["proposals"])
 
@@ -36,10 +38,14 @@ _DECISION_ERRORS: dict[int | str, dict[str, str]] = {
 
 
 @router.post("/proposals/run")
-async def run_proposal_checks(session: SessionDep, today: TodayDep) -> RunChecksOut:
+async def run_proposal_checks(
+    session: SessionDep, today: TodayDep, background: BackgroundTasks, agents: AgentsDep
+) -> RunChecksOut:
     """Apply the reorder and payment rules to the current data. Creates proposals only;
-    nothing is ordered, held or sent until a human approves."""
+    nothing is ordered, held or sent until a human approves. Then, in the background, an
+    approval agent per new proposal asks the language model to explain it and waits."""
     result = await run_checks(session, today=today, actor=OWNER)
+    background.add_task(agents.start_pending)
     pending = await list_proposals(session, "pending")
     return RunChecksOut(
         created=len(result.created),
@@ -61,19 +67,19 @@ async def get_proposals(
 
 @router.post("/proposals/{proposal_id}/approve", responses=_DECISION_ERRORS)
 async def approve_proposal(
-    proposal_id: int, session: SessionDep, body: DecisionIn | None = None
+    proposal_id: int, session: SessionDep, agents: AgentsDep, body: DecisionIn | None = None
 ) -> ProposalOut:
     """Approve: a reorder creates a purchase order, a hold puts the customer on hold, and a
     reminder is prepared for sending. Written to the audit log."""
-    return await _decide(decisions.approve, proposal_id, session, body)
+    return await _decide("approve", proposal_id, session, agents, body)
 
 
 @router.post("/proposals/{proposal_id}/reject", responses=_DECISION_ERRORS)
 async def reject_proposal(
-    proposal_id: int, session: SessionDep, body: DecisionIn | None = None
+    proposal_id: int, session: SessionDep, agents: AgentsDep, body: DecisionIn | None = None
 ) -> ProposalOut:
     """Reject: nothing happens except the decision being recorded, with the note."""
-    return await _decide(decisions.reject, proposal_id, session, body)
+    return await _decide("reject", proposal_id, session, agents, body)
 
 
 @router.get("/purchase-orders")
@@ -108,10 +114,15 @@ async def get_purchase_orders(session: SessionDep) -> PurchaseOrdersOut:
 
 
 async def _decide(
-    action: decisions.Decide, proposal_id: int, session: SessionDep, body: DecisionIn | None
+    action: Action,
+    proposal_id: int,
+    session: SessionDep,
+    agents: AgentRunner,
+    body: DecisionIn | None,
 ) -> ProposalOut:
     try:
-        await action(session, proposal_id, actor=OWNER, note=body.note if body else None)
+        # The proposal's agent resumes from interrupt() and applies the decision.
+        await agents.decide(proposal_id, action, body.note if body else None)
     except decisions.ProposalNotFound as exc:
         raise ApiError(
             404, "proposal_not_found", f"There is no proposal with id {proposal_id}."
@@ -119,6 +130,9 @@ async def _decide(
     except decisions.ProposalNotPending as exc:
         await session.rollback()
         raise ApiError(409, "proposal_already_decided", str(exc)) from exc
+    except OrderNotReady as exc:
+        await session.rollback()
+        raise ApiError(409, "order_not_ready", str(exc)) from exc
     view = await get_proposal_view(session, proposal_id)
     assert view is not None
     return _out(view)
@@ -128,6 +142,12 @@ def _out(view: ProposalView) -> ProposalOut:
     proposal = view.proposal
     if view.sku is not None:
         subject = ProposalSubjectOut(type="product", code=view.sku, name=view.product_name or "")
+    elif proposal.order_id is not None:
+        subject = ProposalSubjectOut(
+            type="order",
+            code=view.customer_code or "?",
+            name=view.customer_name or view.order_sender or "",
+        )
     else:
         subject = ProposalSubjectOut(
             type="customer", code=view.customer_code or "", name=view.customer_name or ""
@@ -147,4 +167,8 @@ def _out(view: ProposalView) -> ProposalOut:
         purchase_order_id=view.purchase_order_id,
         payment_reminder_id=view.payment_reminder_id,
         reminder_message=view.reminder_message,
+        order_id=proposal.order_id,
+        explanation=proposal.explanation,
+        explained_by=proposal.explained_by,
+        draft_message=proposal.draft_message,
     )

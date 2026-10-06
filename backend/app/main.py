@@ -7,10 +7,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
 
-from app.api import customers, health, issues, products, proposals, uploads
+from app.agents.approval import AgentRunner
+from app.agents.checkpoint import open_checkpointer
+from app.api import customers, health, issues, orders, products, proposals, uploads
 from app.api.errors import error_response, register_error_handlers
 from app.config import get_settings
-from app.db.session import get_engine
+from app.db.session import get_engine, get_sessionmaker
+from app.intake.whatsapp_import import fail_interrupted_uploads
+from app.intake.whatsapp_orders import ask_llm
 from app.logging_config import new_request_id, request_id_var, setup_logging
 
 setup_logging(get_settings().log_level)
@@ -18,8 +22,14 @@ logger = logging.getLogger("app.request")
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    yield
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # A chat being read when the server stopped will never finish: say so instead of
+    # leaving it "processing" for ever.
+    await fail_interrupted_uploads()
+    # Paused approval agents live in Postgres; open the checkpointer once for the app's life.
+    async with open_checkpointer(get_settings().database_url) as checkpointer:
+        app.state.agents = AgentRunner(get_sessionmaker(), checkpointer, ask_llm)
+        yield
     await get_engine().dispose()  # close pooled connections on shutdown
 
 
@@ -31,6 +41,7 @@ app.include_router(products.router)
 app.include_router(issues.router)
 app.include_router(customers.router)
 app.include_router(proposals.router)
+app.include_router(orders.router)
 
 
 @app.middleware("http")

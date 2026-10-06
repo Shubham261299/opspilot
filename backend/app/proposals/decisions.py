@@ -27,7 +27,8 @@ from app.db.models import (
     PurchaseOrderLine,
 )
 from app.domain.money import format_inr
-from app.proposals.checks import HOLD_ORDERS, PAYMENT_REMINDER, REORDER
+from app.proposals.checks import CONFIRM_ORDER, HOLD_ORDERS, PAYMENT_REMINDER, REORDER
+from app.proposals.orders import confirm_order, reject_order
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,9 @@ async def approve(
         created = await _put_on_hold(session, proposal)
     elif proposal.kind == PAYMENT_REMINDER:
         created = await _prepare_reminder(session, proposal)
-    else:  # the database only allows the three kinds above
+    elif proposal.kind == CONFIRM_ORDER:
+        created = await confirm_order(session, proposal)  # may refuse: OrderNotReady
+    else:  # the database only allows the four kinds above
         raise ValueError(f"unknown proposal kind {proposal.kind!r}")
     return await _decide(session, proposal, "approved", actor, note, created)
 
@@ -70,7 +73,8 @@ async def reject(
     session: AsyncSession, proposal_id: int, *, actor: str, note: str | None = None
 ) -> Proposal:
     proposal = await _lock_pending(session, proposal_id)
-    return await _decide(session, proposal, "rejected", actor, note, {})
+    undone = await reject_order(session, proposal) if proposal.kind == CONFIRM_ORDER else {}
+    return await _decide(session, proposal, "rejected", actor, note, undone)
 
 
 async def _lock_pending(session: AsyncSession, proposal_id: int) -> Proposal:
@@ -151,7 +155,8 @@ async def _prepare_reminder(session: AsyncSession, proposal: Proposal) -> dict[s
     reminder = PaymentReminder(
         customer_id=customer.id,
         proposal_id=proposal.id,
-        message=reminder_message(customer, proposal.numbers),
+        # The language model's draft, if it passed the checks; else the template.
+        message=proposal.draft_message or reminder_message(customer, proposal.numbers),
     )
     session.add(reminder)
     await session.flush()

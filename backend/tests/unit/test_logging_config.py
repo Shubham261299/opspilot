@@ -41,3 +41,9 @@ def test_missing_or_unsafe_request_id_is_replaced() -> None:
         request_id = new_request_id(incoming)
         assert request_id != incoming
         assert len(request_id) == 32
+
+
+def test_objects_added_to_every_record_by_libraries_are_left_out() -> None:
+    line = _log_line("hello", upload_id=3, litellm_redacted=object())
+    assert line["upload_id"] == 3
+    assert "litellm_redacted" not in line

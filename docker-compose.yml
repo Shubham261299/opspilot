@@ -30,6 +30,13 @@ services:
       # The sample data describes 24 Sep 2026, so the demo treats that day as "today"
       # (overdue days and the 90-day sales window depend on it). Set APP_TODAY to change it.
       APP_TODAY: ${APP_TODAY:-2026-09-24}
+      # The language model (decision 024): Ollama running on this computer, reached from
+      # inside the container through host.docker.internal.
+      # 14b for the demo: more accurate than 7b, 2.6x slower (decision 029); 7b for quick dev runs
+      LLM_MODEL: ${LLM_MODEL:-ollama_chat/qwen2.5:14b}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+    extra_hosts:
+      - "host.docker.internal:host-gateway" # Docker Desktop has this name; Linux needs this line
     ports:
       - "8000:8000"
     depends_on:

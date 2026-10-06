@@ -45,11 +45,17 @@ class JsonFormatter(logging.Formatter):
         if request_id:
             payload["request_id"] = request_id
         for key, value in vars(record).items():
-            if key not in _SKIPPED_ATTRS and not key.startswith("_"):
+            # Only plain values: libraries can add their own objects to every record (LiteLLM
+            # adds a `litellm_redacted` marker), which mean nothing in a log line.
+            if key not in _SKIPPED_ATTRS and not key.startswith("_") and _is_plain(value):
                 payload[key] = value
         if record.exc_info:
             payload["exc"] = self.formatException(record.exc_info)
         return json.dumps(payload, default=str)
+
+
+def _is_plain(value: object) -> bool:
+    return value is None or isinstance(value, str | int | float | bool | list | tuple | dict)
 
 
 def setup_logging(level: str = "INFO") -> None:

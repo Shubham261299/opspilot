@@ -45,6 +45,10 @@ logger = logging.getLogger(__name__)
 REORDER = "reorder"
 PAYMENT_REMINDER = "payment_reminder"
 HOLD_ORDERS = "hold_orders"
+CONFIRM_ORDER = "confirm_order"
+# The kinds "run checks" creates and keeps up to date. Order confirmations come from WhatsApp
+# uploads instead, so a run must never touch them.
+CHECK_KINDS = (REORDER, PAYMENT_REMINDER, HOLD_ORDERS)
 _RUN_LOCK = 4_242_001  # any fixed number; identifies the "run checks" lock in Postgres
 
 
@@ -77,7 +81,11 @@ async def run_checks(session: AsyncSession, *, today: date, actor: str) -> RunRe
     wanted = await _reorders_wanted(session, today, basis, result)
     wanted += await _payments_wanted(session, today, basis, result)
 
-    pending = (await session.scalars(select(Proposal).where(Proposal.status == "pending"))).all()
+    pending = (
+        await session.scalars(
+            select(Proposal).where(Proposal.status == "pending", Proposal.kind.in_(CHECK_KINDS))
+        )
+    ).all()
     by_subject = {(p.kind, p.product_id, p.customer_id): p for p in pending}
     last_decided = await _last_decided(session)
     wanted_keys = set()
@@ -147,7 +155,7 @@ async def _last_decided(
     """The most recent approved or rejected proposal for each kind and subject."""
     decided = await session.scalars(
         select(Proposal)
-        .where(Proposal.status.in_(("approved", "rejected")))
+        .where(Proposal.status.in_(("approved", "rejected")), Proposal.kind.in_(CHECK_KINDS))
         .order_by(Proposal.decided_at, Proposal.id)
     )
     return {(p.kind, p.product_id, p.customer_id): p for p in decided.all()}  # later wins

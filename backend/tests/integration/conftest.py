@@ -25,8 +25,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from app.agents.approval import AgentRunner
+from app.agents.checkpoint import open_checkpointer
 from app.db.models import Base
 from app.db.seed import ProductRow, SupplierRow, read_csv_rows, seed_reference_data
+from app.llm.client import LlmError
 
 DEFAULT_TEST_DATABASE_URL = "postgresql+asyncpg://opspilot:opspilot@localhost:5433/opspilot_test"
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
@@ -119,14 +122,30 @@ async def seeded(db_session: AsyncSession, sample_data_dir: Path) -> None:
     )
 
 
+class ModelUnavailable:
+    """The default "language model" in tests: never reachable, so the code's own fallbacks
+    (template explanations) are used. Tests that need answers set agents.ask to a fake."""
+
+    async def __call__(self, messages: object, schema: object, purpose: str) -> object:
+        raise LlmError("unavailable", "no language model in tests")
+
+
 @pytest.fixture
-async def client(db_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
+async def agents(db_engine: AsyncEngine) -> AsyncIterator[AgentRunner]:
+    """Approval agents with a real Postgres checkpointer on the test database."""
+    sessions = async_sessionmaker(db_engine, expire_on_commit=False)
+    async with open_checkpointer(TEST_DATABASE_URL) as checkpointer:
+        yield AgentRunner(sessions, checkpointer, ModelUnavailable())
+
+
+@pytest.fixture
+async def client(db_engine: AsyncEngine, agents: AgentRunner) -> AsyncIterator[AsyncClient]:
     """An HTTP client that calls the app directly (no server), using the test database.
 
     httpx's ASGITransport hands each request straight to the FastAPI app in this process.
     """
-    from app.api.deps import get_today
-    from app.db.session import get_session
+    from app.api.deps import get_agents, get_today
+    from app.db.session import get_session, get_sessionmaker
     from app.main import app  # imported here, after DATABASE_URL points at the test database
 
     sessions = async_sessionmaker(db_engine, expire_on_commit=False)
@@ -136,6 +155,8 @@ async def client(db_engine: AsyncEngine) -> AsyncIterator[AsyncClient]:
             yield session
 
     app.dependency_overrides[get_session] = test_session
+    app.dependency_overrides[get_sessionmaker] = lambda: sessions  # for background tasks
+    app.dependency_overrides[get_agents] = lambda: agents
     app.dependency_overrides[get_today] = lambda: TEST_TODAY
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
         yield http

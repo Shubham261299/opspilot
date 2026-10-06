@@ -9,6 +9,7 @@ from datetime import date
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/config.py -> repo root, where a developer's .env lives. In Docker the
@@ -26,6 +27,14 @@ class Settings(BaseSettings):
     max_upload_mb: int = 5
     # Pin "today" (e.g. 2026-09-24, the sample data's date) for demos; unset = the real date.
     app_today: date | None = None
+    # The shop's own name in WhatsApp chats; its messages are replies, not orders.
+    shop_name: str = "Sharma Traders"
+
+    # Language model, through LiteLLM (decision 024). "ollama_chat/<model>" = a local Ollama.
+    llm_model: str = "ollama_chat/qwen2.5:7b"
+    llm_base_url: str | None = "http://localhost:11434"
+    llm_api_key: SecretStr | None = None  # only for hosted models; SecretStr hides it in logs
+    llm_timeout_s: float = 180  # a CPU-only laptop can take a while on a long chat
 
 
 @lru_cache

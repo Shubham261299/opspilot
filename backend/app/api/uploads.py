@@ -5,9 +5,16 @@ from dataclasses import asdict
 from decimal import Decimal
 from typing import Annotated, Any
 
-from fastapi import APIRouter, File, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, File, UploadFile, status
 
-from app.api.deps import SessionDep, SettingsDep, TodayDep
+from app.api.deps import (
+    AgentsDep,
+    AskDep,
+    SessionDep,
+    SessionFactoryDep,
+    SettingsDep,
+    TodayDep,
+)
 from app.api.errors import ApiError
 from app.api.schemas import (
     CustomersUploadOut,
@@ -15,17 +22,23 @@ from app.api.schemas import (
     PoNoteOut,
     SalesUploadOut,
     StockUploadOut,
+    UploadAcceptedOut,
     UploadOut,
     UploadsOut,
 )
 from app.config import Settings
 from app.db.audit import OWNER
-from app.db.queries import recent_uploads
+from app.db.queries import get_upload, recent_uploads
 from app.intake.customers_import import import_customers
 from app.intake.dues_import import import_outstanding_dues
 from app.intake.issues import IssueRecord
 from app.intake.sales_import import import_sales_history
 from app.intake.stock_import import import_stock_register
+from app.intake.whatsapp_import import (
+    AlreadyUploaded,
+    process_whatsapp_upload,
+    start_whatsapp_upload,
+)
 
 router = APIRouter(prefix="/uploads", tags=["uploads"])
 PAISE = Decimal("0.01")
@@ -41,6 +54,65 @@ _XLSX_RESPONSES: dict[int | str, dict[str, Any]] = {
 async def list_uploads(session: SessionDep) -> UploadsOut:
     """The most recent uploads of every kind, newest first."""
     return UploadsOut(items=[UploadOut.model_validate(u) for u in await recent_uploads(session)])
+
+
+@router.get("/{upload_id}", responses={404: {"description": "No upload with this id"}})
+async def get_one_upload(upload_id: int, session: SessionDep) -> UploadOut:
+    """One upload; poll this to see a WhatsApp chat move from processing to processed."""
+    upload = await get_upload(session, upload_id)
+    if upload is None:
+        raise ApiError(404, "upload_not_found", f"There is no upload with id {upload_id}.")
+    return UploadOut.model_validate(upload)
+
+
+@router.post(
+    "/whatsapp",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        409: {"description": "This exact chat was already uploaded"},
+        413: {"description": "The file is over the size limit"},
+        415: {"description": "Not a .txt file"},
+        422: {"description": "Empty, or not a WhatsApp export (recorded as a failed upload)"},
+    },
+)
+async def upload_whatsapp_chat(
+    file: Annotated[UploadFile, File(description="A WhatsApp chat export, as a .txt file")],
+    session: SessionDep,
+    settings: SettingsDep,
+    today: TodayDep,
+    background: BackgroundTasks,
+    sessions: SessionFactoryDep,
+    ask: AskDep,
+    agents: AgentsDep,
+) -> UploadAcceptedOut:
+    """Upload a WhatsApp chat export. The language model reads it in the background (a few
+    minutes); poll GET /uploads/{id}. Every order then waits in the Approval Inbox."""
+    filename, content = await _read_file(
+        file, settings, "the WhatsApp chat", ".txt", "a .txt chat export"
+    )
+    try:
+        upload = await start_whatsapp_upload(
+            session, filename=filename, content=content, shop_name=settings.shop_name, actor=OWNER
+        )
+    except AlreadyUploaded as exc:
+        raise ApiError(409, exc.code, exc.message, {"upload_id": exc.upload_id}) from exc
+    # BackgroundTasks run after the response has been sent, in this same server process.
+    background.add_task(
+        process_whatsapp_upload,
+        sessions,
+        upload.id,
+        content,
+        ask=ask,
+        shop_name=settings.shop_name,
+        today=today,
+        actor=OWNER,
+    )
+    background.add_task(agents.start_pending)  # runs after the chat has been read
+    return UploadAcceptedOut(
+        upload=UploadOut.model_validate(upload),
+        message=f"Reading {upload.rows_read} messages with the language model. "
+        "This takes a few minutes; the orders will appear in the Approval Inbox.",
+    )
 
 
 @router.post("/stock", status_code=status.HTTP_201_CREATED, responses=_XLSX_RESPONSES)

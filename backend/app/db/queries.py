@@ -11,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import (
     Customer,
     CustomerBill,
+    CustomerOrder,
+    CustomerOrderLine,
+    Enquiry,
     Issue,
     OpenPoNote,
     PaymentReminder,
@@ -29,6 +32,7 @@ STOCK_REGISTER = "stock_register"
 CUSTOMERS = "customers"
 OUTSTANDING_DUES = "outstanding_dues"
 SALES_HISTORY = "sales_history"
+WHATSAPP_CHAT = "whatsapp_chat"
 
 
 @dataclass(frozen=True)
@@ -228,6 +232,7 @@ class ProposalView:
     purchase_order_id: int | None
     payment_reminder_id: int | None
     reminder_message: str | None
+    order_sender: str | None
 
 
 def _proposal_views() -> Select[Any]:
@@ -242,9 +247,15 @@ def _proposal_views() -> Select[Any]:
             PurchaseOrder.id,
             PaymentReminder.id,
             PaymentReminder.message,
+            CustomerOrder.sender,
         )
         .outerjoin(Product, Product.id == Proposal.product_id)
-        .outerjoin(Customer, Customer.id == Proposal.customer_id)
+        .outerjoin(CustomerOrder, CustomerOrder.id == Proposal.order_id)
+        # the customer: the proposal's own, or the order's
+        .outerjoin(
+            Customer,
+            Customer.id == func.coalesce(Proposal.customer_id, CustomerOrder.customer_id),
+        )
         .outerjoin(PurchaseOrder, PurchaseOrder.proposal_id == Proposal.id)
         .outerjoin(PaymentReminder, PaymentReminder.proposal_id == Proposal.id)
     )
@@ -294,3 +305,62 @@ async def list_purchase_orders(session: AsyncSession) -> list[PurchaseOrderView]
     for line, product in lines:
         by_order.setdefault(line.purchase_order_id, []).append((line, product))
     return [PurchaseOrderView(o, sup, by_order.get(o.id, [])) for o, sup in orders]
+
+
+@dataclass(frozen=True)
+class OrderView:
+    order: CustomerOrder
+    customer: Customer | None
+    lines: list[tuple[CustomerOrderLine, Product | None]]
+    proposal_id: int | None
+
+
+async def list_orders(
+    session: AsyncSession, status: str | None = None, order_id: int | None = None
+) -> list[OrderView]:
+    stmt = (
+        select(CustomerOrder, Customer)
+        .outerjoin(Customer, Customer.id == CustomerOrder.customer_id)
+        .order_by(CustomerOrder.first_sent_at.desc(), CustomerOrder.id.desc())
+        .limit(500)
+    )
+    if status is not None:
+        stmt = stmt.where(CustomerOrder.status == status)
+    if order_id is not None:
+        stmt = stmt.where(CustomerOrder.id == order_id)
+    orders = (await session.execute(stmt)).all()
+    ids = [order.id for order, _ in orders]
+    lines = (
+        await session.execute(
+            select(CustomerOrderLine, Product)
+            .outerjoin(Product, Product.id == CustomerOrderLine.product_id)
+            .where(CustomerOrderLine.order_id.in_(ids))
+            .order_by(CustomerOrderLine.id)
+        )
+    ).all()
+    proposals = dict(
+        (
+            await session.execute(
+                select(Proposal.order_id, func.max(Proposal.id))
+                .where(Proposal.order_id.in_(ids))
+                .group_by(Proposal.order_id)
+            )
+        ).all()
+    )
+    by_order: dict[int, list[tuple[CustomerOrderLine, Product | None]]] = {}
+    for line, product in lines:
+        by_order.setdefault(line.order_id, []).append((line, product))
+    return [
+        OrderView(order, customer, by_order.get(order.id, []), proposals.get(order.id))
+        for order, customer in orders
+    ]
+
+
+async def list_enquiries(session: AsyncSession) -> list[tuple[Enquiry, str | None]]:
+    rows = await session.execute(
+        select(Enquiry, Customer.code)
+        .outerjoin(Customer, Customer.id == Enquiry.customer_id)
+        .order_by(Enquiry.id.desc())
+        .limit(500)
+    )
+    return [(enquiry, code) for enquiry, code in rows.all()]
