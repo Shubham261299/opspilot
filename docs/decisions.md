@@ -432,6 +432,118 @@ prompt was improved on this same sample, as there is no second chat to test on, 
 in-sample numbers. The same model can also read an ambiguous line differently between runs
 ("bend 200"), which is why doubtful lines go to review instead of into the order.
 
+## 034 · Reading invoice PDFs: pypdf, code reads the table, arithmetic proves it (2026-10-07)
+
+**Context:** Four supplier invoices (text PDFs, not scans), each with a header, an item table
+and totals; one is a copy stamped DUPLICATE COPY. A misread rate or quantity would pay the wrong
+amount. The stack named PyMuPDF.
+**Options:** PyMuPDF · pypdf. For the lines: let the model read everything · code reads the
+printed table, the model reads the rest.
+**Choice:** pypdf (BSD licence; PyMuPDF is AGPL, which would bind a public project's licence).
+Text is extracted in layout mode, so a table row stays on one line with its columns apart (plain
+mode falls back per page, as layout mode fails on a blank page). The model copies the header and
+totals as printed, as text. Code parses every figure and reads the item rows itself
+(`rows_from_table`), and uses its rows only when each qty × rate = amount and they add up to the
+subtotal; otherwise the model's lines are used. `domain/invoice_math.py` checks every line, the
+subtotal, GST and the grand total to the paisa; a mismatch is an issue and blocks approval.
+Products are matched like WhatsApp lines (code first, then the model picks, code checks the
+pick). Scanned PDFs are refused with a clear message (no text), not guessed.
+**Why:** On the first real run qwen2.5:7b read Kiran's "90 m" cable length as the quantity; the
+arithmetic check caught it, and code reading the table fixed it. On the dev stack
+(qwen2.5:14b) all four invoices were read from the table by code, every line matched.
+
+## 035 · "Last purchase rate" for the price-jump check (2026-10-07)
+
+**Context:** Policy 4.1 flags an invoice line more than 10% above the last purchase rate. The
+app has no purchase history before the first invoice upload.
+**Options:** Only earlier invoices (so the first invoice of a product is never checked) ·
+the product master's cost price only · the latest earlier invoice, else the cost price.
+**Choice:** The latest earlier payable invoice line for that product (by invoice date; duplicates
+and rejected invoices don't count), else the product master's `cost_price`. The proposal says
+which one was used. A jump doesn't block approval; it marks the proposal "owner approval" and
+the owner decides with it in view. The rule is strict ("more than 10%") and uses exact decimals.
+**Why:** Every line is checked from the first upload on, and the comparison is shown, not just
+the verdict. Measured: BL-0874's 9W bulb at ₹63.36 against ₹48 (+32.0%) is flagged and nothing
+else, which matches the answer key.
+
+## 036 · What "usual" means for the order-size check (2026-10-07)
+
+**Context:** Policy 3.1 flags an order more than 5× the customer's average for that item. The
+sample sales history is counter-sized (1–10 units a line) while WhatsApp orders are bulk, so
+against sales history the rule flags 28 lines, of which the answer key lists one (Royal
+Hardware's 200 coils, 120× their usual).
+**Options:** (A) tune the threshold until only Royal is caught · (B) the customer's earlier
+confirmed WhatsApp orders for the item, falling back to sales history · (C) sales history only.
+**Choice:** B. Each order line shows its usual quantity, how many times larger it is and where
+"usual" came from ("12 sales in the 90-day history" or "2 confirmed orders"). A flag marks the
+order "owner approval", it doesn't block it. The rule itself stays as written (more than 5×).
+**Why:** Tuning to fit the answer key would be overfitting (no threshold catches only Royal).
+With B, the flags fade as real orders build up: a test confirms orders of 150 and 180, after
+which 200 is normal for that customer. The 28 is pinned in a test so any change to the rule shows.
+
+## 037 · A duplicate invoice can never be paid (2026-10-07)
+
+**Context:** Policy 4.2: the same supplier's invoice number twice is a duplicate. Two copies can
+arrive together (both uploaded at once), and invoice numbers are printed loosely (`SC-118`,
+`SC 118`).
+**Options:** Trust the "DUPLICATE COPY" stamp · compare numbers, in code, under a lock.
+**Choice:** An invoice is a duplicate when the same supplier already has a non-rejected invoice
+with the same number, compared with case and punctuation ignored. A duplicate is saved with
+status `duplicate`, reported as an error issue, and gets no proposal, so it can't be approved.
+The check runs under a Postgres advisory lock per supplier and number, held until commit, so of
+two copies saved at the same moment exactly one is payable (tested). The stamp alone is never
+trusted: the copy is caught by its number.
+**Why:** Paying twice is the costly mistake; with no proposal there is no button to press.
+
+## 038 · The app queues its own calls to the language model (2026-10-07)
+
+**Context:** A local Ollama answers one request at a time. When three invoices were uploaded
+together, the third waited in Ollama's queue, used up its 180 s timeout before it started, and
+was reported as "could not be reached".
+**Options:** A longer timeout · queue the calls in the app.
+**Choice:** Calls wait in the app (`LLM_MAX_CONCURRENCY`, default 1; raise it for a hosted model),
+so the timeout only counts the model's own work. A timeout now says so ("didn't answer within
+180 s, it may be busy") instead of "could not be reached".
+**Why:** A longer timeout only hides the problem until the queue is longer; the queue fixes it,
+and the message tells the owner what actually happened.
+
+## 039 · Live updates: a WebSocket that says what changed, from one process (2026-10-07)
+
+**Context:** Explanations, chats and invoices are finished in the background, minutes after
+the click; the Inbox only showed them after a manual refresh.
+**Options:** Pages poll every few seconds · a WebSocket per page. For fan-out: an in-memory
+broadcaster in the API process · Postgres LISTEN/NOTIFY.
+**Choice:** One WebSocket (`/ws`) shared by the whole web app. The code that changes proposals or
+uploads publishes an event after its commit (`proposal.created`, `.updated`, `.explained`,
+`.decided`, `upload.finished`); an in-memory broadcaster (`app/events.py`) hands it to every
+open connection. Events carry only kinds and ids; pages reload their data over normal HTTP,
+gathering a burst of events into one reload. Each connection has a small queue, and a page
+that stops reading loses its oldest events instead of slowing the app. The browser reconnects
+by itself (1 s, doubling to 15 s) and reloads after a reconnect, since events may have been
+missed; the WhatsApp card still checks every 15 s as a fallback. A dot in the header shows
+whether updates are live. nginx and Vite forward the upgrade to the API.
+**Why:** Polling every page would mostly ask about nothing, and a background result would still
+arrive late. Events that carry no data can't leak anything a page couldn't already load, and
+keep the API's checks and types in one place. The demo runs one API process, so the in-memory
+broadcaster is enough; LISTEN/NOTIFY is noted in Ideas for more than one.
+
+## 040 · Agents cut off by a restart carry on at start-up (2026-10-12)
+
+**Context:** An agent's *explain* step calls the model and can take a minute. A restart during it
+left the proposal "being explained" for ever: its graph was claimed but never reached *wait*.
+Found on the dev stack, where an invoice proposal kept that label for days.
+**Options:** Clear the claim and start again · carry the graph on from its last checkpoint.
+**Choice:** When the API starts, a background task (`AgentRunner.recover()`) looks for pending
+proposals whose agent never finished explaining. A graph with a saved checkpoint is carried on
+from it (LangGraph runs the unfinished step again when given no new input); one with nothing
+saved is released, and then every unclaimed proposal gets an agent, as after "Run checks". It
+runs in the background so a slow model never delays start-up. Deciding was never blocked: a
+decision before *wait* goes straight to the approve/reject code (decision 031).
+**Why:** The checkpointer already saves where each graph is; using it is what makes the agents
+durable, not only the pause at `interrupt()`. Tested by crashing an agent mid-explanation and
+recovering it with a new runner; on the dev stack the stuck proposal was explained on the next
+start.
+
 ---
 
 ## Ideas
@@ -449,3 +561,10 @@ Out of scope for the current phase; pick up when the phase allows.
 - Purchase order follow-up: mark a PO sent and received, so received stock stops counting as on
   order.
 - A pending count next to "Approval Inbox" in the navigation.
+- Live updates across several API processes with Postgres LISTEN/NOTIFY (the week 4 broadcaster
+  lives in one process, which is all the demo runs).
+- Scanned (image-only) invoice PDFs, read with OCR.
+- Mark an approved invoice paid, with the payment date and reference.
+- Check an invoice's GSTIN against the supplier's (add GSTINs to the supplier master): the sample
+  copy of SC-118 prints a different GSTIN from the original.
+- A Prettier check in CI for the frontend (the code is mostly, not fully, formatted that way).
