@@ -31,11 +31,12 @@ from app.db.audit import OWNER
 from app.db.queries import get_upload, recent_uploads
 from app.intake.customers_import import import_customers
 from app.intake.dues_import import import_outstanding_dues
+from app.intake.errors import AlreadyUploaded
+from app.intake.invoice_import import process_invoice_upload, start_invoice_upload
 from app.intake.issues import IssueRecord
 from app.intake.sales_import import import_sales_history
 from app.intake.stock_import import import_stock_register
 from app.intake.whatsapp_import import (
-    AlreadyUploaded,
     process_whatsapp_upload,
     start_whatsapp_upload,
 )
@@ -112,6 +113,45 @@ async def upload_whatsapp_chat(
         upload=UploadOut.model_validate(upload),
         message=f"Reading {upload.rows_read} messages with the language model. "
         "This takes a few minutes; the orders will appear in the Approval Inbox.",
+    )
+
+
+@router.post(
+    "/invoice",
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        409: {"description": "This exact PDF was already uploaded"},
+        413: {"description": "The file is over the size limit"},
+        415: {"description": "Not a .pdf file"},
+        422: {"description": "Not a readable PDF with text (recorded as a failed upload)"},
+    },
+)
+async def upload_supplier_invoice(
+    file: Annotated[UploadFile, File(description="A supplier's tax invoice, as a .pdf file")],
+    session: SessionDep,
+    settings: SettingsDep,
+    today: TodayDep,
+    background: BackgroundTasks,
+    sessions: SessionFactoryDep,
+    ask: AskDep,
+    agents: AgentsDep,
+) -> UploadAcceptedOut:
+    """Upload a supplier invoice PDF. The language model reads it in the background (about a
+    minute); code checks the arithmetic. Poll GET /uploads/{id}."""
+    filename, content = await _read_file(file, settings, "the invoice", ".pdf", "a .pdf file")
+    try:
+        upload, text = await start_invoice_upload(
+            session, filename=filename, content=content, actor=OWNER
+        )
+    except AlreadyUploaded as exc:
+        raise ApiError(409, exc.code, exc.message, {"upload_id": exc.upload_id}) from exc
+    background.add_task(
+        process_invoice_upload, sessions, upload.id, text, ask=ask, today=today, actor=OWNER
+    )
+    background.add_task(agents.start_pending)
+    return UploadAcceptedOut(
+        upload=UploadOut.model_validate(upload),
+        message="Reading the invoice with the language model; this takes about a minute.",
     )
 
 

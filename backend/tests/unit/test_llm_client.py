@@ -1,5 +1,6 @@
 """complete_structured() with a fake model: no network, the same answers every run."""
 
+import asyncio
 from types import SimpleNamespace
 from typing import Any
 
@@ -40,7 +41,7 @@ ASK = [{"role": "user", "content": "10 pkt gitti"}]
 GOOD = '{"lines": [{"product_text": "gitti", "qty": 10}]}'
 
 
-async def ask(model: FakeModel) -> Any:
+async def ask(model: Any) -> Any:
     return await complete_structured(
         ASK, Lines, purpose="test", settings=SETTINGS, completion=model
     )
@@ -91,3 +92,25 @@ async def test_an_api_key_is_passed_only_when_configured() -> None:
     hosted = SETTINGS.model_copy(update={"llm_api_key": SecretStr("secret")})
     await complete_structured(ASK, Lines, purpose="test", settings=hosted, completion=model)
     assert [call["api_key"] for call in model.calls] == [None, "secret"]
+
+
+async def test_calls_wait_in_the_apps_queue_one_at_a_time() -> None:
+    running, most = 0, 0
+
+    async def slow_model(**kwargs: Any) -> Any:
+        nonlocal running, most
+        running += 1
+        most = max(most, running)
+        await asyncio.sleep(0.01)
+        running -= 1
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=GOOD))])
+
+    await asyncio.gather(*(ask(slow_model) for _ in range(3)))
+    assert most == 1
+
+
+async def test_a_timeout_says_so() -> None:
+    model = FakeModel(TimeoutError())
+    with pytest.raises(LlmError) as error:
+        await ask(model)
+    assert "didn't answer within 180 s" in error.value.message

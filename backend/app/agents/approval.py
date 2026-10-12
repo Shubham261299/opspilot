@@ -15,6 +15,9 @@
 
 If a human decides before the explanation is ready, the decision goes straight to the same
 approve/reject code and the graph ends without waiting.
+
+A restart can cut a graph off while it explains (the model takes a while). At start-up,
+recover() carries such graphs on from their last checkpoint, and starts any that never ran.
 """
 
 import logging
@@ -27,15 +30,16 @@ from langgraph.types import Command, interrupt
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import events
 from app.db.audit import OWNER
 from app.db.models import Customer, CustomerOrder, Proposal
 from app.domain.matching import normalise_name
 from app.domain.text_numbers import unexpected_numbers
-from app.intake.whatsapp_orders import Ask
+from app.intake.product_picks import Ask
 from app.llm.client import LlmError
 from app.llm.explain import ReminderDraft, explain_messages, schema_for
 from app.proposals import decisions
-from app.proposals.orders import OrderNotReady
+from app.proposals.errors import NotReady, not_ready
 
 logger = logging.getLogger(__name__)
 Action = Literal["approve", "reject"]
@@ -85,6 +89,42 @@ class AgentRunner:
         if started:
             logger.info("approval agents started", extra={"agents": started})
         return started
+
+    async def recover(self) -> int:
+        """At start-up: finish graphs a restart cut off before they reached `wait`, then
+        start graphs for proposals that never got one. Returns how many were carried on."""
+        async with self.sessions() as session:
+            cut_off = (
+                await session.execute(
+                    select(Proposal.id, Proposal.agent_thread_id).where(
+                        Proposal.status == "pending",
+                        Proposal.agent_thread_id.is_not(None),
+                        Proposal.explained_by.is_(None),  # explain never finished
+                    )
+                )
+            ).all()
+        resumed = 0
+        for proposal_id, thread_id in cut_off:
+            config = _config(thread_id)
+            if (await self.graph.aget_state(config)).next:
+                # Saved part-way: None as input means "carry on from the last checkpoint".
+                try:
+                    await self.graph.ainvoke(None, config)
+                    resumed += 1
+                except Exception:  # one broken graph mustn't stop the others
+                    logger.exception(
+                        "approval agent not recovered", extra={"proposal_id": proposal_id}
+                    )
+            else:  # nothing saved yet: let start_pending begin it again
+                async with self.sessions() as session:
+                    proposal = await session.get(Proposal, proposal_id)
+                    if proposal is not None:
+                        proposal.agent_thread_id = None
+                    await session.commit()
+        if cut_off:
+            logger.info("approval agents recovered", extra={"agents": len(cut_off)})
+        await self.start_pending()
+        return resumed
 
     async def _claim_next(self) -> tuple[int, str] | None:
         thread_id = uuid.uuid4().hex
@@ -150,6 +190,7 @@ class AgentRunner:
             proposal.explained_by = "llm" if written is not None else "template"
             still_pending = proposal.status == "pending"
             await session.commit()
+        events.proposal_explained(state["proposal_id"])
         return {"still_pending": still_pending}
 
     async def _write(
@@ -197,15 +238,16 @@ class AgentRunner:
             except decisions.ProposalNotPending as exc:
                 await session.rollback()
                 return {"outcome": {"error": "proposal_already_decided", "message": str(exc)}}
-            except OrderNotReady as exc:
+            except NotReady as exc:
                 await session.rollback()
-                return {"outcome": {"error": "order_not_ready", "message": str(exc)}}
+                return {"outcome": {"error": exc.code, "message": exc.message}}
         return {"outcome": {"status": proposal.status}}
 
     @staticmethod
     def _after_apply(state: ApprovalState) -> str:
         # Refused because something must be fixed first: wait for the next decision.
-        return "wait" if state["outcome"].get("error") == "order_not_ready" else END
+        error = state["outcome"].get("error")
+        return "wait" if error and error != "proposal_already_decided" else END
 
 
 def _config(thread_id: str) -> dict[str, Any]:
@@ -216,8 +258,8 @@ def _raise_if_refused(outcome: dict[str, Any]) -> None:
     error = outcome.get("error")
     if error == "proposal_already_decided":
         raise decisions.ProposalNotPending("decided")
-    if error == "order_not_ready":
-        raise OrderNotReady(outcome["message"])
+    if error is not None:
+        raise not_ready(error, outcome["message"])
 
 
 async def _customers(session: AsyncSession, proposal: Proposal) -> tuple[str | None, list[str]]:

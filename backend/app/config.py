@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     llm_base_url: str | None = "http://localhost:11434"
     llm_api_key: SecretStr | None = None  # only for hosted models; SecretStr hides it in logs
     llm_timeout_s: float = 180  # a CPU-only laptop can take a while on a long chat
+    # How many calls may run at once; a local Ollama answers one at a time, so the rest
+    # wait in the app instead of timing out in the model's queue. Raise for a hosted model.
+    llm_max_concurrency: int = 1
 
 
 @lru_cache

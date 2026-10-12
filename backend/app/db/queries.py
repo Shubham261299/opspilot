@@ -23,6 +23,8 @@ from app.db.models import (
     PurchaseOrderLine,
     StockLevel,
     Supplier,
+    SupplierInvoice,
+    SupplierInvoiceLine,
     Upload,
 )
 from app.domain.catalog import Catalog, CatalogProduct, CatalogSupplier
@@ -33,6 +35,7 @@ CUSTOMERS = "customers"
 OUTSTANDING_DUES = "outstanding_dues"
 SALES_HISTORY = "sales_history"
 WHATSAPP_CHAT = "whatsapp_chat"
+SUPPLIER_INVOICE = "supplier_invoice"
 
 
 @dataclass(frozen=True)
@@ -233,6 +236,8 @@ class ProposalView:
     payment_reminder_id: int | None
     reminder_message: str | None
     order_sender: str | None
+    invoice_supplier: str | None  # supplier code, or the name as printed when unknown
+    invoice_no: str | None
 
 
 def _proposal_views() -> Select[Any]:
@@ -248,8 +253,12 @@ def _proposal_views() -> Select[Any]:
             PaymentReminder.id,
             PaymentReminder.message,
             CustomerOrder.sender,
+            func.coalesce(Supplier.code, SupplierInvoice.supplier_name),
+            SupplierInvoice.invoice_no,
         )
         .outerjoin(Product, Product.id == Proposal.product_id)
+        .outerjoin(SupplierInvoice, SupplierInvoice.id == Proposal.invoice_id)
+        .outerjoin(Supplier, Supplier.id == SupplierInvoice.supplier_id)
         .outerjoin(CustomerOrder, CustomerOrder.id == Proposal.order_id)
         # the customer: the proposal's own, or the order's
         .outerjoin(
@@ -364,3 +373,42 @@ async def list_enquiries(session: AsyncSession) -> list[tuple[Enquiry, str | Non
         .limit(500)
     )
     return [(enquiry, code) for enquiry, code in rows.all()]
+
+
+@dataclass(frozen=True)
+class InvoiceView:
+    invoice: SupplierInvoice
+    supplier: Supplier | None
+    lines: list[tuple[SupplierInvoiceLine, Product | None]]
+    proposal: Proposal | None  # its "approve for payment" proposal; None for a duplicate
+
+
+async def list_invoices(session: AsyncSession) -> list[InvoiceView]:
+    invoices = (
+        await session.execute(
+            select(SupplierInvoice, Supplier)
+            .outerjoin(Supplier, Supplier.id == SupplierInvoice.supplier_id)
+            .order_by(SupplierInvoice.created_at.desc(), SupplierInvoice.id.desc())
+            .limit(200)
+        )
+    ).all()
+    lines = (
+        await session.execute(
+            select(SupplierInvoiceLine, Product)
+            .outerjoin(Product, Product.id == SupplierInvoiceLine.product_id)
+            .where(SupplierInvoiceLine.invoice_id.in_([i.id for i, _ in invoices]))
+            .order_by(SupplierInvoiceLine.line_no)
+        )
+    ).all()
+    by_invoice: dict[int, list[tuple[SupplierInvoiceLine, Product | None]]] = {}
+    for line, product in lines:
+        by_invoice.setdefault(line.invoice_id, []).append((line, product))
+    proposals = (
+        await session.scalars(
+            select(Proposal)
+            .where(Proposal.invoice_id.in_([i.id for i, _ in invoices]))
+            .order_by(Proposal.id)
+        )
+    ).all()
+    latest = {p.invoice_id: p for p in proposals}  # ordered by id, so the newest wins
+    return [InvoiceView(i, s, by_invoice.get(i.id, []), latest.get(i.id)) for i, s in invoices]

@@ -13,10 +13,21 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import events
 from app.db.audit import audit_entry
-from app.db.models import Customer, CustomerOrder, CustomerOrderLine, Product, Proposal
+from app.db.models import (
+    Customer,
+    CustomerOrder,
+    CustomerOrderLine,
+    Product,
+    Proposal,
+    SalesLine,
+)
+from app.db.queries import SALES_HISTORY, current_upload
+from app.domain.anomalies import order_size_anomaly
 from app.domain.money import format_inr
 from app.proposals.checks import CONFIRM_ORDER
+from app.proposals.errors import OrderNotReady
 
 
 class OrderNotFound(Exception):
@@ -37,10 +48,6 @@ class UnknownProduct(Exception):
         super().__init__(f"There is no product {sku}.")
 
 
-class OrderNotReady(Exception):
-    """Approving would confirm something incomplete; the message says what to fix first."""
-
-
 async def describe_order(session: AsyncSession, order: CustomerOrder) -> tuple[dict[str, Any], str]:
     """The proposal's numbers and its plain-language reason, from the order as it is now."""
     rows = (
@@ -54,22 +61,38 @@ async def describe_order(session: AsyncSession, order: CustomerOrder) -> tuple[d
     customer = await session.get(Customer, order.customer_id) if order.customer_id else None
     lines = []
     value = Decimal(0)
+    large = []
     for line, product in rows:
         amount = product.sell_price * line.qty if product else None
         value += amount or 0
-        lines.append(
-            {
-                "line_id": line.id,
-                "written": line.written,
-                "qty": line.qty,
-                "unit_written": line.unit_written,
-                "sku": product.sku if product else None,
-                "name": product.name if product else None,
-                "unit": product.unit if product else None,
-                "matched_on": line.matched_on,
-                "amount": str(amount) if amount is not None else None,
-            }
-        )
+        entry: dict[str, Any] = {
+            "line_id": line.id,
+            "written": line.written,
+            "qty": line.qty,
+            "unit_written": line.unit_written,
+            "sku": product.sku if product else None,
+            "name": product.name if product else None,
+            "unit": product.unit if product else None,
+            "matched_on": line.matched_on,
+            "amount": str(amount) if amount is not None else None,
+            "usual_qty": None,
+            "times_usual": None,
+            "usual_from": None,
+        }
+        if product is not None and customer is not None:
+            past, source = await _usual_quantities(session, order, customer.id, product.id)
+            anomaly = order_size_anomaly(line.qty, past)
+            if anomaly is not None:
+                entry |= {
+                    "usual_qty": str(anomaly.usual_qty),
+                    "times_usual": str(anomaly.times_usual),
+                    "usual_from": source,
+                }
+                large.append(
+                    f"{line.qty} {product.name} is {anomaly.times_usual}x their usual "
+                    f"{anomaly.usual_qty} (from {source})"
+                )
+        lines.append(entry)
     unmatched = [line["written"] for line in lines if line["sku"] is None]
     on_hold = bool(customer and customer.on_hold)
     attention = []
@@ -81,6 +104,10 @@ async def describe_order(session: AsyncSession, order: CustomerOrder) -> tuple[d
         attention.append(f"choose the product for: {', '.join(repr(w) for w in unmatched)}")
     if order.unclear:
         attention.append(f"ask the customer about: {'; '.join(order.unclear)}")
+    if large:
+        attention.append(
+            "unusually large, so confirm with the customer (policy 3.1): " + "; ".join(large)
+        )
     by_model = [line["written"] for line in lines if line["matched_on"] == "model"]
     if by_model:
         attention.append(f"check the language model's match for: {', '.join(by_model)}")
@@ -100,9 +127,48 @@ async def describe_order(session: AsyncSession, order: CustomerOrder) -> tuple[d
         "est_value": str(value),
         "unclear": list(order.unclear),
         "customer_on_hold": on_hold,
+        "unusually_large": len(large),
+        "needs_owner": bool(large) or on_hold,
         "ready": not unmatched and customer is not None,
     }
     return numbers, reason
+
+
+async def _usual_quantities(
+    session: AsyncSession, order: CustomerOrder, customer_id: int, product_id: int
+) -> tuple[list[int], str]:
+    """What this customer usually takes of this product (decision 036): their earlier
+    CONFIRMED WhatsApp orders; without any, their sales history (counter-sized lines, so it
+    flags more)."""
+    confirmed = (
+        await session.scalars(
+            select(CustomerOrderLine.qty)
+            .join(CustomerOrder, CustomerOrder.id == CustomerOrderLine.order_id)
+            .where(
+                CustomerOrder.customer_id == customer_id,
+                CustomerOrder.status == "confirmed",
+                CustomerOrder.id != order.id,
+                CustomerOrderLine.product_id == product_id,
+            )
+        )
+    ).all()
+    if confirmed:
+        return list(
+            confirmed
+        ), f"{len(confirmed)} confirmed order{'s' if len(confirmed) > 1 else ''}"
+    sales = await current_upload(session, SALES_HISTORY)
+    if sales is None:
+        return [], "no history"
+    history = (
+        await session.scalars(
+            select(SalesLine.qty).where(
+                SalesLine.upload_id == sales.id,
+                SalesLine.customer_id == customer_id,
+                SalesLine.product_id == product_id,
+            )
+        )
+    ).all()
+    return list(history), f"{len(history)} sales in the 90-day history"
 
 
 async def create_order_proposal(
@@ -169,6 +235,8 @@ async def set_order_line(
     if proposal is not None:
         proposal.numbers, proposal.reason = await describe_order(session, order)
     await session.commit()
+    if proposal is not None:
+        events.proposals_updated([proposal.id])
     return order
 
 

@@ -141,12 +141,14 @@ class CustomersOut(BaseModel):
     items: list[CustomerOut]
 
 
-ProposalKind = Literal["reorder", "payment_reminder", "hold_orders", "confirm_order"]
+ProposalKind = Literal[
+    "reorder", "payment_reminder", "hold_orders", "confirm_order", "approve_invoice"
+]
 ProposalStatus = Literal["pending", "approved", "rejected", "superseded"]
 
 
 class ProposalSubjectOut(BaseModel):
-    type: Literal["product", "customer", "order"]
+    type: Literal["product", "customer", "order", "invoice"]
     code: str  # SKU, party code, or for an order the party code ("?" if the sender is unknown)
     name: str
 
@@ -167,6 +169,7 @@ class ProposalOut(BaseModel):
     payment_reminder_id: int | None = Field(description="Created when a reminder is approved")
     reminder_message: str | None
     order_id: int | None = Field(description="For a confirm_order proposal: the order")
+    invoice_id: int | None = Field(description="For an approve_invoice proposal: the invoice")
     explanation: str | None = Field(
         description="Written by the language model and checked by code; null until then"
     )
@@ -261,3 +264,46 @@ class EnquiryOut(BaseModel):
 
 class EnquiriesOut(BaseModel):
     items: list[EnquiryOut]
+
+
+class InvoiceLineOut(BaseModel):
+    line_no: int
+    description: str = Field(description="As printed on the invoice")
+    qty: Decimal
+    rate: Decimal
+    amount: Decimal
+    sku: str | None = Field(description="null: not matched yet")
+    name: str | None
+    matched_on: str | None
+    cost_price: Decimal | None = Field(description="Our cost price for this product")
+    last_rate: Decimal | None = Field(
+        description="The last purchase rate the price check used (from the proposal)"
+    )
+    last_rate_from: str | None = Field(description="An earlier invoice, or the cost price")
+    jump_percent: Decimal | None = Field(description="Set when more than 10% above last_rate")
+
+
+class InvoiceOut(BaseModel):
+    id: int
+    upload_id: int
+    status: Literal["awaiting_approval", "approved_for_payment", "rejected", "duplicate"]
+    supplier_code: str | None
+    supplier_name: str = Field(description="As printed")
+    supplier_gstin: str | None
+    invoice_no: str
+    invoice_date: date | None
+    subtotal: Decimal
+    gst_amount: Decimal
+    grand_total: Decimal
+    marked_duplicate: bool
+    notes: list[str]
+    lines_read_by: Literal["table", "model"]
+    lines: list[InvoiceLineOut]
+    proposal_id: int | None = Field(description="null: a duplicate, never proposed for payment")
+    ready: bool | None = Field(description="Can be approved: supplier, products and figures OK")
+    price_jumps: int | None
+    created_at: datetime
+
+
+class InvoicesOut(BaseModel):
+    items: list[InvoiceOut]

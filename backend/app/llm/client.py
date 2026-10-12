@@ -12,6 +12,7 @@ The model is never trusted with arithmetic: callers ask it to extract, classify 
 things, and code checks the result (CLAUDE.md rule 3).
 """
 
+import asyncio
 import logging
 import os
 import re
@@ -19,6 +20,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any, Literal
+from weakref import WeakKeyDictionary
 
 from pydantic import BaseModel, ValidationError
 
@@ -99,26 +101,50 @@ async def _call(
     purpose: str,
     attempt: int,
 ) -> str:
-    try:
-        response = await completion(
-            model=settings.llm_model,
-            api_base=settings.llm_base_url,
-            api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else None,
-            messages=messages,
-            response_format=schema,
-            temperature=0,  # the same input should give the same answer
-            timeout=settings.llm_timeout_s,
-        )
-    except Exception as exc:  # connection refused, timeout, unknown model, provider error...
-        logger.warning(
-            "llm call failed",
-            extra={"purpose": purpose, "llm_model": settings.llm_model, "attempt": attempt},
-        )
-        raise LlmError(
-            "unavailable", f"The language model ({settings.llm_model}) could not be reached."
-        ) from exc
+    # Wait in the app's own queue first: a local model answers one request at a time, and a
+    # call waiting in the model's queue would use up its timeout before it even starts.
+    async with _queue(settings.llm_max_concurrency):
+        try:
+            response = await completion(
+                model=settings.llm_model,
+                api_base=settings.llm_base_url,
+                api_key=settings.llm_api_key.get_secret_value() if settings.llm_api_key else None,
+                messages=messages,
+                response_format=schema,
+                temperature=0,  # the same input should give the same answer
+                timeout=settings.llm_timeout_s,
+            )
+        except Exception as exc:  # connection refused, timeout, unknown model, provider error
+            logger.warning(
+                "llm call failed",
+                extra={
+                    "purpose": purpose,
+                    "llm_model": settings.llm_model,
+                    "attempt": attempt,
+                    "error_type": type(exc).__name__,
+                },
+            )
+            if isinstance(exc, litellm.Timeout | TimeoutError):
+                message = (
+                    f"The language model ({settings.llm_model}) didn't answer within "
+                    f"{settings.llm_timeout_s:.0f} s (it may be busy or too slow for this input)."
+                )
+            else:
+                message = f"The language model ({settings.llm_model}) could not be reached."
+            raise LlmError("unavailable", message) from exc
     content = response.choices[0].message.content
     return content if isinstance(content, str) else ""
+
+
+_queues: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = WeakKeyDictionary()
+
+
+def _queue(size: int) -> asyncio.Semaphore:
+    """One queue per event loop (tests run several loops; a semaphore belongs to one)."""
+    loop = asyncio.get_running_loop()
+    if loop not in _queues:
+        _queues[loop] = asyncio.Semaphore(max(size, 1))
+    return _queues[loop]
 
 
 def _strip_fences(text: str) -> str:

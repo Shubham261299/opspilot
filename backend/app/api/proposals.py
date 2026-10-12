@@ -27,7 +27,7 @@ from app.db.queries import (
 )
 from app.proposals import decisions
 from app.proposals.checks import run_checks
-from app.proposals.orders import OrderNotReady
+from app.proposals.errors import NotReady
 
 router = APIRouter(tags=["proposals"])
 
@@ -130,9 +130,9 @@ async def _decide(
     except decisions.ProposalNotPending as exc:
         await session.rollback()
         raise ApiError(409, "proposal_already_decided", str(exc)) from exc
-    except OrderNotReady as exc:
+    except NotReady as exc:
         await session.rollback()
-        raise ApiError(409, "order_not_ready", str(exc)) from exc
+        raise ApiError(409, exc.code, exc.message) from exc
     view = await get_proposal_view(session, proposal_id)
     assert view is not None
     return _out(view)
@@ -142,6 +142,12 @@ def _out(view: ProposalView) -> ProposalOut:
     proposal = view.proposal
     if view.sku is not None:
         subject = ProposalSubjectOut(type="product", code=view.sku, name=view.product_name or "")
+    elif proposal.invoice_id is not None:
+        subject = ProposalSubjectOut(
+            type="invoice",
+            code=view.invoice_supplier or "?",
+            name=f"Invoice {view.invoice_no}",
+        )
     elif proposal.order_id is not None:
         subject = ProposalSubjectOut(
             type="order",
@@ -168,6 +174,7 @@ def _out(view: ProposalView) -> ProposalOut:
         payment_reminder_id=view.payment_reminder_id,
         reminder_message=view.reminder_message,
         order_id=proposal.order_id,
+        invoice_id=proposal.invoice_id,
         explanation=proposal.explanation,
         explained_by=proposal.explained_by,
         draft_message=proposal.draft_message,

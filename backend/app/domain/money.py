@@ -1,6 +1,7 @@
 """Showing rupee amounts the Indian way: ₹1,78,200 (lakh and crore grouping)."""
 
-from decimal import ROUND_HALF_UP, Decimal
+import re
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 
 def format_inr(amount: Decimal | int) -> str:
@@ -17,3 +18,18 @@ def format_inr(amount: Decimal | int) -> str:
         groups.insert(0, head)
         rupees = ",".join([*groups, tail])
     return f"{sign}₹{rupees}" + ("" if paise == "00" else f".{paise}")
+
+
+def parse_amount(text: str | int | float | None) -> Decimal | None:
+    """An amount as people write it ("1,620.00", "Rs 1,04,600.00", "₹ 63.36") -> Decimal.
+
+    None when it isn't an amount."""
+    if text is None or isinstance(text, bool):
+        return None
+    cleaned = re.sub(r"^\s*(₹|rs\.?|inr)\s*", "", str(text), flags=re.IGNORECASE)
+    cleaned = cleaned.replace(",", "").strip()
+    try:
+        amount = Decimal(cleaned)
+    except InvalidOperation:
+        return None
+    return amount if amount.is_finite() else None

@@ -17,40 +17,20 @@ import time
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Literal, Protocol
-
-from pydantic import BaseModel
+from typing import Literal
 
 from app.domain.catalog import Catalog
 from app.domain.matching import match_product_by_words, normalise_name
 from app.domain.units import normalise_unit
 from app.intake.issues import IssueRecord, IssueType
+from app.intake.product_picks import Ask, ask_llm, pick_products
 from app.intake.whatsapp import Chat, Thread
-from app.llm.client import LlmError, complete_structured
-from app.llm.whatsapp import (
-    Message,
-    ProductPicks,
-    ThreadReading,
-    pick_products_messages,
-    read_thread_messages,
-)
+from app.llm.client import LlmError
+from app.llm.whatsapp import ThreadReading, read_thread_messages
 
 logger = logging.getLogger(__name__)
 
 MatchedOn = Literal["name", "alias", "same words", "model"]
-
-
-class Ask(Protocol):
-    """Send messages to the model and get back an instance of `schema`."""
-
-    async def __call__[T: BaseModel](
-        self, messages: list[Message], schema: type[T], purpose: str
-    ) -> T: ...
-
-
-async def ask_llm[T: BaseModel](messages: list[Message], schema: type[T], purpose: str) -> T:
-    """The real model, through app/llm."""
-    return (await complete_structured(messages, schema, purpose=purpose)).value
 
 
 @dataclass(frozen=True)
@@ -263,22 +243,9 @@ async def _match_lines(
 async def _pick(
     written: list[str], catalog: Catalog, ask: Ask, reading: OrdersReading
 ) -> dict[str, str]:
-    """SKUs the model is sure of, checked against the catalogue. Anything else is left out."""
-    try:
-        reading.model_calls += 1
-        picks = await ask(
-            pick_products_messages(written, catalog.products.values()),
-            ProductPicks,
-            "whatsapp_match",
-        )
-    except LlmError:
-        return {}  # every leftover becomes an "unmatched product" issue instead
-    wanted = set(written)
-    return {
-        pick.written: pick.sku
-        for pick in picks.picks
-        if pick.sure and pick.sku in catalog.products and pick.written in wanted
-    }
+    """SKUs the model is sure of, checked against the catalogue (intake/product_picks.py)."""
+    reading.model_calls += 1
+    return await pick_products(written, catalog, ask, "whatsapp_match")
 
 
 def _without_qty(written: str, qty: int) -> str | None:

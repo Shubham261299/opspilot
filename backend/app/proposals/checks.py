@@ -22,6 +22,7 @@ from typing import Any
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import events
 from app.db.audit import audit_entry
 from app.db.models import (
     Customer,
@@ -46,6 +47,7 @@ REORDER = "reorder"
 PAYMENT_REMINDER = "payment_reminder"
 HOLD_ORDERS = "hold_orders"
 CONFIRM_ORDER = "confirm_order"
+APPROVE_INVOICE = "approve_invoice"
 # The kinds "run checks" creates and keeps up to date. Order confirmations come from WhatsApp
 # uploads instead, so a run must never touch them.
 CHECK_KINDS = (REORDER, PAYMENT_REMINDER, HOLD_ORDERS)
@@ -139,6 +141,8 @@ async def run_checks(session: AsyncSession, *, today: date, actor: str) -> RunRe
         )
     )
     await session.commit()
+    events.proposals_created(result.created)
+    events.proposals_updated(result.superseded)
     logger.info(
         "checks run",
         extra={

@@ -94,7 +94,7 @@ class Upload(Base):
         CheckConstraint("status IN ('processing', 'processed', 'failed')", name="status_valid"),
         CheckConstraint(
             "kind IN ('stock_register', 'customers', 'outstanding_dues', 'sales_history', "
-            "'whatsapp_chat')",
+            "'whatsapp_chat', 'supplier_invoice')",
             name="kind_valid",
         ),
     )
@@ -243,15 +243,17 @@ class Proposal(Base):
     __tablename__ = "proposals"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('reorder', 'payment_reminder', 'hold_orders', 'confirm_order')",
+            "kind IN ('reorder', 'payment_reminder', 'hold_orders', 'confirm_order', "
+            "'approve_invoice')",
             name="kind_valid",
         ),
         CheckConstraint(
             "status IN ('pending', 'approved', 'rejected', 'superseded')", name="status_valid"
         ),
-        # A proposal is about exactly one product, one customer or one customer order.
+        # A proposal is about exactly one product, customer, customer order or supplier invoice.
         CheckConstraint(
-            "num_nonnulls(product_id, customer_id, order_id) = 1", name="exactly_one_subject"
+            "num_nonnulls(product_id, customer_id, order_id, invoice_id) = 1",
+            name="exactly_one_subject",
         ),
         # At most one pending proposal of each kind per product / per customer.
         Index(
@@ -274,6 +276,12 @@ class Proposal(Base):
             unique=True,
             postgresql_where=text("status = 'pending' AND order_id IS NOT NULL"),
         ),
+        Index(
+            "uq_proposals_pending_invoice",
+            "invoice_id",
+            unique=True,
+            postgresql_where=text("status = 'pending' AND invoice_id IS NOT NULL"),
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -282,6 +290,7 @@ class Proposal(Base):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), index=True)
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), index=True)
     order_id: Mapped[int | None] = mapped_column(ForeignKey("customer_orders.id"), index=True)
+    invoice_id: Mapped[int | None] = mapped_column(ForeignKey("supplier_invoices.id"), index=True)
     numbers: Mapped[dict[str, Any]]  # the calculated figures, e.g. reorder point and qty
     basis: Mapped[dict[str, Any]]  # what it was calculated from: upload ids and "today"
     reason: Mapped[str]  # plain-language explanation built by code from the numbers
@@ -395,6 +404,53 @@ class Enquiry(Base):
     text: Mapped[str] = mapped_column(Text)
     source_line: Mapped[int]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class SupplierInvoice(Base):
+    """A supplier's tax invoice read from a PDF. Paid only after a human approves it."""
+
+    __tablename__ = "supplier_invoices"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('awaiting_approval', 'approved_for_payment', 'rejected', 'duplicate')",
+            name="status_valid",
+        ),
+        CheckConstraint("lines_read_by IN ('table', 'model')", name="lines_read_by_valid"),
+        Index("ix_supplier_invoices_supplier_invoice_no", "supplier_id", "invoice_no"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    upload_id: Mapped[int] = mapped_column(ForeignKey("uploads.id", ondelete="CASCADE"), index=True)
+    supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"))
+    supplier_name: Mapped[str]  # as printed
+    supplier_gstin: Mapped[str | None] = mapped_column(String(20))
+    invoice_no: Mapped[str] = mapped_column(String(40))
+    invoice_date: Mapped[date | None]
+    subtotal: Mapped[Decimal]
+    gst_amount: Mapped[Decimal]
+    grand_total: Mapped[Decimal]
+    marked_duplicate: Mapped[bool] = mapped_column(server_default=false())  # "DUPLICATE COPY"
+    notes: Mapped[list[str]] = mapped_column(server_default="{}")
+    # table = rows read by code from the printed table; model = the language model's reading
+    lines_read_by: Mapped[str]
+    status: Mapped[str] = mapped_column(server_default="awaiting_approval")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class SupplierInvoiceLine(Base):
+    __tablename__ = "supplier_invoice_lines"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(
+        ForeignKey("supplier_invoices.id", ondelete="CASCADE"), index=True
+    )
+    line_no: Mapped[int]
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), index=True)
+    description: Mapped[str]  # as printed
+    qty: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    rate: Mapped[Decimal]
+    amount: Mapped[Decimal]
+    matched_on: Mapped[str | None]  # name, alias, same words, model, owner; NULL = not yet
 
 
 class AuditLog(Base):

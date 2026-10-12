@@ -26,6 +26,7 @@ _KIND_TASKS = {
     "payment_reminder": "a payment reminder to a customer",
     "hold_orders": "putting a customer's new orders on hold",
     "confirm_order": "confirming a customer's WhatsApp order",
+    "approve_invoice": "approving a supplier's invoice for payment",
 }
 
 _SYSTEM = """You help the owner of Sharma Traders, an electrical and hardware distributor in \

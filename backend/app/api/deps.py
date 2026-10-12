@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.agents.approval import AgentRunner
 from app.config import Settings, get_settings
 from app.db.session import get_session, get_sessionmaker
-from app.intake.whatsapp_orders import Ask, ask_llm
+from app.intake.product_picks import Ask, ask_llm
 
 
 def get_today() -> date:

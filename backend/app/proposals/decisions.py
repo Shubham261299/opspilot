@@ -17,6 +17,7 @@ from typing import Any, Protocol
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import events
 from app.db.audit import audit_entry
 from app.db.models import (
     Customer,
@@ -27,7 +28,14 @@ from app.db.models import (
     PurchaseOrderLine,
 )
 from app.domain.money import format_inr
-from app.proposals.checks import CONFIRM_ORDER, HOLD_ORDERS, PAYMENT_REMINDER, REORDER
+from app.proposals.checks import (
+    APPROVE_INVOICE,
+    CONFIRM_ORDER,
+    HOLD_ORDERS,
+    PAYMENT_REMINDER,
+    REORDER,
+)
+from app.proposals.invoices import approve_invoice, reject_invoice
 from app.proposals.orders import confirm_order, reject_order
 
 logger = logging.getLogger(__name__)
@@ -64,7 +72,9 @@ async def approve(
         created = await _prepare_reminder(session, proposal)
     elif proposal.kind == CONFIRM_ORDER:
         created = await confirm_order(session, proposal)  # may refuse: OrderNotReady
-    else:  # the database only allows the four kinds above
+    elif proposal.kind == APPROVE_INVOICE:
+        created = await approve_invoice(session, proposal)  # may refuse: InvoiceNotReady
+    else:  # the database only allows the five kinds above
         raise ValueError(f"unknown proposal kind {proposal.kind!r}")
     return await _decide(session, proposal, "approved", actor, note, created)
 
@@ -73,7 +83,11 @@ async def reject(
     session: AsyncSession, proposal_id: int, *, actor: str, note: str | None = None
 ) -> Proposal:
     proposal = await _lock_pending(session, proposal_id)
-    undone = await reject_order(session, proposal) if proposal.kind == CONFIRM_ORDER else {}
+    undone: dict[str, Any] = {}
+    if proposal.kind == CONFIRM_ORDER:
+        undone = await reject_order(session, proposal)
+    elif proposal.kind == APPROVE_INVOICE:
+        undone = await reject_invoice(session, proposal)
     return await _decide(session, proposal, "rejected", actor, note, undone)
 
 
@@ -111,6 +125,7 @@ async def _decide(
         )
     )
     await session.commit()
+    events.proposal_decided(proposal.id, status)
     logger.info(
         "proposal decided",
         extra={"proposal_id": proposal.id, "kind": proposal.kind, "status": status},

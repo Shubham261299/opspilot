@@ -147,6 +147,38 @@ async def test_a_paused_agent_survives_a_restart(dues: AsyncClient, db_engine: A
     assert [(p["id"], p["decision_note"]) for p in rejected] == [(proposal["id"], "paid in cash")]
 
 
+class Crash:
+    """The server stopping while the model is writing (any error that isn't LlmError)."""
+
+    async def __call__(self, messages: Any, schema: type[BaseModel], purpose: str) -> Any:
+        raise RuntimeError("the server stopped")
+
+
+async def test_agents_cut_off_by_a_restart_carry_on_at_start_up(
+    dues: AsyncClient, db_engine: AsyncEngine, db_session: AsyncSession
+) -> None:
+    await run_checks(db_session, today=date(2026, 9, 24), actor="owner")
+    sessions = async_sessionmaker(db_engine, expire_on_commit=False)
+    async with open_checkpointer(TEST_DATABASE_URL) as checkpointer:
+        before = AgentRunner(sessions, checkpointer, Crash())
+        with pytest.raises(RuntimeError):
+            await before.start_pending()  # the first agent dies while explaining
+    cut_off = await db_session.scalar(select(Proposal).where(Proposal.agent_thread_id.is_not(None)))
+    assert cut_off is not None and cut_off.explained_by is None
+
+    async with open_checkpointer(TEST_DATABASE_URL) as checkpointer:
+        after_restart = AgentRunner(sessions, checkpointer, Writer("Remind them politely."))
+        assert await after_restart.recover() == 1  # carried on from its checkpoint
+        db_session.expire_all()
+        proposals = (await db_session.scalars(select(Proposal))).all()
+        assert {p.explained_by for p in proposals} == {"llm"}  # and the rest were started
+        for proposal in proposals:
+            state = await after_restart.graph.aget_state(
+                {"configurable": {"thread_id": proposal.agent_thread_id}}
+            )
+            assert state.next == ("wait",)
+
+
 async def test_a_decision_before_the_agent_started_still_works(
     dues: AsyncClient, agents: AgentRunner, db_session: AsyncSession
 ) -> None:

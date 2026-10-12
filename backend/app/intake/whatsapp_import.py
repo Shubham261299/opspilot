@@ -18,27 +18,23 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app import events
 from app.db.audit import audit_entry
 from app.db.models import CustomerOrder, CustomerOrderLine, Enquiry, Upload
 from app.db.queries import WHATSAPP_CHAT, all_customers, load_reference_data
-from app.intake.errors import IntakeError, UploadRejected
-from app.intake.importing import issue_rows, save_failed_upload, severity_counts
+from app.intake.errors import AlreadyUploaded, IntakeError, UploadRejected
+from app.intake.importing import (
+    issue_rows,
+    mark_background_upload_failed,
+    save_failed_upload,
+    severity_counts,
+)
 from app.intake.whatsapp import ChatFormatError, parse_chat
 from app.intake.whatsapp_orders import Ask, OrdersReading, read_whatsapp_orders
 from app.proposals.orders import create_order_proposal
 
 logger = logging.getLogger(__name__)
 ACTION = f"upload.{WHATSAPP_CHAT}"
-
-
-class AlreadyUploaded(IntakeError):
-    def __init__(self, upload_id: int) -> None:
-        super().__init__(
-            "already_uploaded",
-            f"This exact chat was already uploaded as upload #{upload_id}; its orders are "
-            "in the Approval Inbox.",
-        )
-        self.upload_id = upload_id
 
 
 async def start_whatsapp_upload(
@@ -53,7 +49,7 @@ async def start_whatsapp_upload(
         )
     )
     if earlier is not None:
-        raise AlreadyUploaded(earlier)
+        raise AlreadyUploaded(earlier, "chat")
     try:
         chat = parse_chat(_text(content), shop_name)
     except (IntakeError, ChatFormatError) as exc:
@@ -106,22 +102,9 @@ async def process_whatsapp_upload(
         async with sessions() as session:
             await _save(session, upload_id, reading, reference.product_ids, today, actor)
     except Exception as exc:  # anything at all: record it rather than leave "processing"
-        logger.exception("whatsapp upload failed", extra={"upload_id": upload_id})
-        async with sessions() as session:
-            upload = await session.get(Upload, upload_id)
-            if upload is not None:
-                upload.status = "failed"
-                upload.error = f"Reading the chat failed: {exc}"[:500]
-                session.add(
-                    audit_entry(
-                        actor=actor,
-                        action=ACTION,
-                        entity_type="upload",
-                        entity_id=upload_id,
-                        after={"status": "failed", "error": type(exc).__name__},
-                    )
-                )
-                await session.commit()
+        await mark_background_upload_failed(
+            sessions, upload_id, kind=WHATSAPP_CHAT, what="Reading the chat", error=exc, actor=actor
+        )
 
 
 async def _save(
@@ -201,7 +184,11 @@ async def _save(
             },
         )
     )
+    await session.flush()
+    proposal_ids = [proposal.id for proposal in proposals]
     await session.commit()
+    events.proposals_created(proposal_ids)
+    events.upload_finished(upload_id, WHATSAPP_CHAT, "processed")
     logger.info(
         "whatsapp upload processed",
         extra={"upload_id": upload_id, "orders": len(reading.orders), "proposals": len(proposals)},
@@ -216,7 +203,7 @@ async def fail_interrupted_uploads() -> int:
         stuck = (await session.scalars(select(Upload).where(Upload.status == "processing"))).all()
         for upload in stuck:
             upload.status = "failed"
-            upload.error = "The server restarted while this chat was being read. Upload it again."
+            upload.error = "The server restarted while this file was being read. Upload it again."
         await session.commit()
     if stuck:
         logger.warning("interrupted uploads marked failed", extra={"uploads": len(stuck)})

@@ -1,5 +1,6 @@
 """FastAPI application: wiring only (logging, middleware, error handlers, routers)."""
 
+import asyncio
 import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -9,12 +10,22 @@ from fastapi import FastAPI, Request, Response
 
 from app.agents.approval import AgentRunner
 from app.agents.checkpoint import open_checkpointer
-from app.api import customers, health, issues, orders, products, proposals, uploads
+from app.api import (
+    customers,
+    health,
+    invoices,
+    issues,
+    orders,
+    products,
+    proposals,
+    uploads,
+    ws,
+)
 from app.api.errors import error_response, register_error_handlers
 from app.config import get_settings
 from app.db.session import get_engine, get_sessionmaker
+from app.intake.product_picks import ask_llm
 from app.intake.whatsapp_import import fail_interrupted_uploads
-from app.intake.whatsapp_orders import ask_llm
 from app.logging_config import new_request_id, request_id_var, setup_logging
 
 setup_logging(get_settings().log_level)
@@ -28,8 +39,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await fail_interrupted_uploads()
     # Paused approval agents live in Postgres; open the checkpointer once for the app's life.
     async with open_checkpointer(get_settings().database_url) as checkpointer:
-        app.state.agents = AgentRunner(get_sessionmaker(), checkpointer, ask_llm)
+        app.state.agents = agents = AgentRunner(get_sessionmaker(), checkpointer, ask_llm)
+        # Agents a restart cut off carry on in the background (the model can take minutes).
+        recovering = asyncio.create_task(agents.recover())
         yield
+        recovering.cancel()
     await get_engine().dispose()  # close pooled connections on shutdown
 
 
@@ -42,6 +56,8 @@ app.include_router(issues.router)
 app.include_router(customers.router)
 app.include_router(proposals.router)
 app.include_router(orders.router)
+app.include_router(invoices.router)
+app.include_router(ws.router)
 
 
 @app.middleware("http")

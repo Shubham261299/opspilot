@@ -29,6 +29,8 @@ class IssueType(StrEnum):
     INVALID_BILL = "invalid_bill"
     INVALID_SALE = "invalid_sale"
     THREAD_NOT_READ = "thread_not_read"
+    INVOICE_FIGURE_UNREADABLE = "invoice_figure_unreadable"
+    DUPLICATE_INVOICE = "duplicate_invoice"
     # warning
     BLANK_CODE = "blank_code"
     DUPLICATE_ROW = "duplicate_row"
@@ -47,6 +49,9 @@ class IssueType(StrEnum):
     AMOUNT_MISMATCH = "amount_mismatch"
     UNMATCHED_PRODUCT = "unmatched_product"
     NEEDS_CLARIFICATION = "needs_clarification"
+    INVOICE_ARITHMETIC = "invoice_arithmetic"
+    INVOICE_DATE_UNREADABLE = "invoice_date_unreadable"
+    DUPLICATE_COPY_WITHOUT_ORIGINAL = "duplicate_copy_without_original"
     # info
     SKIPPED_ROW = "skipped_row"
     UNITS_NORMALISED = "units_normalised"
@@ -85,6 +90,8 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.INVALID_BILL,
             IssueType.INVALID_SALE,
             IssueType.THREAD_NOT_READ,
+            IssueType.INVOICE_FIGURE_UNREADABLE,
+            IssueType.DUPLICATE_INVOICE,
         ),
         "error",
     ),
@@ -107,6 +114,9 @@ SEVERITY: dict[IssueType, Severity] = {
             IssueType.AMOUNT_MISMATCH,
             IssueType.UNMATCHED_PRODUCT,
             IssueType.NEEDS_CLARIFICATION,
+            IssueType.INVOICE_ARITHMETIC,
+            IssueType.INVOICE_DATE_UNREADABLE,
+            IssueType.DUPLICATE_COPY_WITHOUT_ORIGINAL,
         ),
         "warning",
     ),
