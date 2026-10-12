@@ -83,7 +83,7 @@ export interface CustomerList {
   items: Customer[]
 }
 
-export type ProposalKind = 'reorder' | 'payment_reminder' | 'hold_orders' | 'confirm_order'
+export type ProposalKind = 'reorder' | 'payment_reminder' | 'hold_orders' | 'confirm_order' | 'approve_invoice'
 export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'superseded'
 
 export interface OverdueBill {
@@ -124,7 +124,9 @@ export interface ProposalNumbers {
   est_value?: string
   unclear?: string[]
   customer_on_hold?: boolean
-  ready?: boolean // every line has a product and the sender is a known customer
+  unusually_large?: number // lines more than 5x the customer's usual (policy 3.1)
+  ready?: boolean // confirm_order: every line has a product and the sender is known;
+  //                 approve_invoice: known supplier, every line matched, figures add up
 }
 
 export interface ProposedOrderLine {
@@ -137,13 +139,55 @@ export interface ProposedOrderLine {
   unit: string | null
   matched_on: string | null
   amount: string | null
+  // Set only when the line is more than 5x what this customer usually takes (policy 3.1).
+  usual_qty: string | null
+  times_usual: string | null
+  usual_from: string | null // "12 sales in the 90-day history" or "2 confirmed orders"
+}
+
+/** One line of an "approve for payment" proposal, with the price check (policy 4.1). */
+export interface ProposedInvoiceLine {
+  line_no: number
+  description: string // as printed
+  sku: string | null
+  name: string | null
+  qty: string
+  rate: string
+  amount: string
+  last_rate: string | null
+  last_rate_from: string | null // "invoice KC/26-27/2291 of 12 Sep 2026" or the cost price
+  jump_percent: string | null // set when the rate is more than 10% above last_rate
+}
+
+/** The numbers of an approve_invoice proposal. */
+export interface InvoiceProposalNumbers {
+  supplier_code: string | null
+  supplier_name: string
+  supplier_gstin: string | null
+  invoice_no: string
+  invoice_date: string | null
+  subtotal: string
+  gst_amount: string
+  grand_total: string
+  lines: ProposedInvoiceLine[]
+  price_jumps: number
+  needs_owner: boolean
+  arithmetic_problems: string[]
+  marked_duplicate: boolean
+  ready: boolean
+}
+
+/** A proposal's numbers read as an invoice's. Only for kind 'approve_invoice': its `lines`
+ * differ from an order's, so they get their own type instead of joining ProposalNumbers. */
+export function invoiceNumbers(proposal: Proposal): InvoiceProposalNumbers {
+  return proposal.numbers as unknown as InvoiceProposalNumbers
 }
 
 export interface Proposal {
   id: number
   kind: ProposalKind
   status: ProposalStatus
-  subject: { type: 'product' | 'customer' | 'order'; code: string; name: string }
+  subject: { type: 'product' | 'customer' | 'order' | 'invoice'; code: string; name: string }
   numbers: ProposalNumbers
   reason: string
   basis: Record<string, unknown>
@@ -155,6 +199,7 @@ export interface Proposal {
   payment_reminder_id: number | null
   reminder_message: string | null
   order_id: number | null
+  invoice_id: number | null
   explanation: string | null // written by the language model, checked by code
   explained_by: 'llm' | 'template' | null // null: still being written
   draft_message: string | null // a reminder's message to the customer
@@ -202,6 +247,49 @@ export interface Enquiry {
 
 export interface EnquiryList {
   items: Enquiry[]
+}
+
+export type InvoiceStatus = 'awaiting_approval' | 'approved_for_payment' | 'rejected' | 'duplicate'
+
+export interface InvoiceLine {
+  line_no: number
+  description: string // as printed on the invoice
+  qty: string
+  rate: string
+  amount: string
+  sku: string | null // null: not matched yet
+  name: string | null
+  matched_on: string | null
+  cost_price: string | null // our cost price in the product master
+  last_rate: string | null // what the price check compared with (from the proposal)
+  last_rate_from: string | null
+  jump_percent: string | null
+}
+
+export interface Invoice {
+  id: number
+  upload_id: number
+  status: InvoiceStatus
+  supplier_code: string | null // null: not a known supplier
+  supplier_name: string // as printed
+  supplier_gstin: string | null
+  invoice_no: string
+  invoice_date: string | null
+  subtotal: string
+  gst_amount: string
+  grand_total: string
+  marked_duplicate: boolean // the PDF is stamped DUPLICATE COPY
+  notes: string[]
+  lines_read_by: 'table' | 'model' // read from the printed table by code, or by the model
+  lines: InvoiceLine[]
+  proposal_id: number | null // null: a duplicate, never proposed for payment
+  ready: boolean | null
+  price_jumps: number | null
+  created_at: string
+}
+
+export interface InvoiceList {
+  items: Invoice[]
 }
 
 export interface ProposalList {
@@ -315,7 +403,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export type UploadKind = 'stock' | 'customers' | 'dues' | 'sales' | 'whatsapp'
+export type UploadKind = 'stock' | 'customers' | 'dues' | 'sales' | 'whatsapp' | 'invoice'
 
 function upload<T>(kind: UploadKind, file: File): Promise<T> {
   const form = new FormData()
@@ -337,6 +425,10 @@ export const api = {
   uploadDues: (file: File) => upload<DuesUploadResult>('dues', file),
   uploadSales: (file: File) => upload<SalesUploadResult>('sales', file),
   uploadWhatsapp: (file: File) => upload<UploadAccepted>('whatsapp', file),
+  uploadInvoice: (file: File) => upload<UploadAccepted>('invoice', file),
+  invoices(): Promise<InvoiceList> {
+    return request('/invoices')
+  },
   upload(id: number): Promise<Upload> {
     return request(`/uploads/${id}`)
   },

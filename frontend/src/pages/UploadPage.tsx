@@ -1,5 +1,5 @@
-import { ArrowRight, CircleCheck, CircleX, LoaderCircle } from 'lucide-react'
-import { type ReactNode, useEffect, useState } from 'react'
+import { ArrowRight, CircleCheck, CircleX, FileText, LoaderCircle } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
 import { ErrorAlert } from '@/components/ErrorAlert'
@@ -19,7 +19,9 @@ import {
   type UploadSummary,
 } from '@/lib/api'
 import { formatDate, formatRupees, plural } from '@/lib/format'
+import { useLiveEvents } from '@/hooks/useLive'
 import { SEVERITIES } from '@/lib/issues'
+import { cn } from '@/lib/utils'
 
 interface FileKind<T extends UploadSummary> {
   title: string
@@ -104,6 +106,7 @@ export function UploadPage() {
         <UploadCard kind={DUES} />
         <UploadCard kind={SALES} />
         <WhatsAppCard />
+        <InvoiceCard />
       </div>
     </>
   )
@@ -172,16 +175,23 @@ function WhatsAppCard() {
   const [error, setError] = useState<Error | null>(null)
   const seconds = useSecondsSince(upload?.status === 'processing' ? upload.created_at : null)
 
-  // While the model reads the chat, ask the API for the upload's status every 5 seconds.
+  // While the model reads the chat: the server says when it's done (a live event), and the
+  // card also asks every 15 seconds in case live updates aren't getting through.
   useEffect(() => {
     if (upload?.status !== 'processing') return
     const timer = setInterval(() => {
       api.upload(upload.id).then(setUpload, (err: unknown) => {
         setError(err instanceof Error ? err : new Error(String(err)))
       })
-    }, 5000)
+    }, 15_000)
     return () => clearInterval(timer)
   }, [upload])
+  useLiveEvents((event) => {
+    if (event.type !== 'upload.finished' || event.upload_id !== upload?.id) return
+    api.upload(event.upload_id).then(setUpload, (err: unknown) => {
+      setError(err instanceof Error ? err : new Error(String(err)))
+    })
+  })
 
   async function send(file: File) {
     if (sending || upload?.status === 'processing') return
@@ -263,6 +273,154 @@ function WhatsAppCard() {
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/** One invoice PDF on the card: being sent, being read, or done. */
+interface InvoiceFile {
+  key: number
+  filename: string
+  upload: Upload | null // null while the file is being sent
+  error: Error | null // the API refused it (not a PDF, no text, already uploaded)
+}
+
+/**
+ * Several PDFs can be dropped at once. Each is read in the background (the model reads one at
+ * a time, so later ones wait their turn); a live event says when each is done.
+ */
+function InvoiceCard() {
+  const [files, setFiles] = useState<InvoiceFile[]>([])
+  const nextKey = useRef(0)
+
+  function change(match: (f: InvoiceFile) => boolean, update: Partial<InvoiceFile>) {
+    setFiles((all) => all.map((f) => (match(f) ? { ...f, ...update } : f)))
+  }
+
+  function refresh(uploadId: number) {
+    api.upload(uploadId).then(
+      (upload) => change((f) => f.upload?.id === uploadId, { upload }),
+      () => undefined, // keep what's shown; the next event or check tries again
+    )
+  }
+
+  async function send(file: File) {
+    const key = nextKey.current++
+    setFiles((all) => [...all, { key, filename: file.name, upload: null, error: null }])
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      change((f) => f.key === key, { error: new Error(`"${file.name}" is not a .pdf file.`) })
+      return
+    }
+    try {
+      const { upload } = await api.uploadInvoice(file)
+      change((f) => f.key === key, { upload })
+    } catch (err) {
+      change((f) => f.key === key, { error: err instanceof Error ? err : new Error(String(err)) })
+    }
+  }
+
+  useLiveEvents((event) => {
+    if (event.type === 'upload.finished' && files.some((f) => f.upload?.id === event.upload_id)) {
+      refresh(event.upload_id)
+    }
+  })
+  // A fallback in case live updates aren't getting through.
+  const waiting = files.filter((f) => f.upload?.status === 'processing').map((f) => f.upload!.id)
+  const waitingKey = waiting.join(',')
+  useEffect(() => {
+    if (!waitingKey) return
+    const timer = setInterval(() => {
+      for (const id of waitingKey.split(',')) refresh(Number(id))
+    }, 15_000)
+    return () => clearInterval(timer)
+  }, [waitingKey])
+
+  const sending = files.filter((f) => f.upload === null && f.error === null).length
+  return (
+    <Card className="md:col-span-2">
+      <CardHeader>
+        <CardTitle>6 · Supplier invoices</CardTitle>
+        <CardDescription>
+          Tax invoices as PDFs (with text, not scans). Code reads the item table and checks every figure; the
+          language model reads the rest. Each invoice then waits in the Approval Inbox to be approved for payment,
+          and a second copy of an invoice is caught and never paid.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <FileDropZone
+          label="Drop the invoice_*.pdf files here"
+          hint="or click to choose · .pdf, several at once, up to 5 MB each"
+          accept=".pdf,application/pdf"
+          multiple
+          icon={FileText}
+          busyLabel={sending > 0 ? `Uploading ${plural(sending, 'file')}…` : null}
+          onFile={(file) => void send(file)}
+        />
+        {files.length > 0 && (
+          <ul className="divide-y rounded-lg border bg-muted/30 text-sm">
+            {files.map((file) => (
+              <InvoiceFileRow key={file.key} file={file} />
+            ))}
+          </ul>
+        )}
+        {files.some((f) => f.upload?.status === 'processed') && (
+          <div className="flex flex-wrap gap-4 text-sm">
+            <Link to="/invoices" className="underline">
+              See the invoices
+            </Link>
+            <Link to="/inbox" className="underline">
+              Approve them in the Approval Inbox
+            </Link>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+function InvoiceFileRow({ file }: { file: InvoiceFile }) {
+  const { upload, error } = file
+  const seconds = useSecondsSince(upload?.status === 'processing' ? upload.created_at : null)
+  const existingId = error instanceof ApiError ? uploadIdFrom(error.details) : null
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+      {error || upload?.status === 'failed' ? (
+        <CircleX className="size-4 shrink-0 text-destructive" aria-hidden />
+      ) : upload?.status === 'processed' ? (
+        <CircleCheck className="size-4 shrink-0 text-emerald-600" aria-hidden />
+      ) : (
+        <LoaderCircle className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
+      )}
+      <span className="font-medium">{file.filename}</span>
+      <span className={cn('text-muted-foreground', (error || upload?.status === 'failed') && 'text-destructive')}>
+        {error ? (
+          <>
+            {error.message}
+            {existingId !== null && (
+              <>
+                {' '}
+                <Link to={`/issues?upload=${existingId}`} className="underline">
+                  See upload #{existingId}
+                </Link>
+              </>
+            )}
+          </>
+        ) : upload === null ? (
+          'Uploading…'
+        ) : upload.status === 'processing' ? (
+          `Reading… ${seconds}s (about a minute each; later files wait their turn)`
+        ) : upload.status === 'failed' ? (
+          upload.error
+        ) : (
+          <>
+            {plural(upload.rows_read, 'line')} read
+            {upload.as_of && `, dated ${formatDate(upload.as_of)}`} ·{' '}
+            <Link to={`/issues?upload=${upload.id}`} className="underline">
+              Issues
+            </Link>
+          </>
+        )}
+      </span>
+    </li>
   )
 }
 

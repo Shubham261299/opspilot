@@ -55,6 +55,11 @@ const ISSUE_TYPE_LABELS: Record<string, string> = {
   needs_clarification: 'Ask the customer',
   product_matched_by_llm: 'Product matched by the language model',
   unit_written_differently: 'Unit written differently',
+  invoice_figure_unreadable: 'Invoice figure unreadable',
+  duplicate_invoice: 'Duplicate invoice (never paid)',
+  invoice_arithmetic: "Invoice figures don't add up",
+  invoice_date_unreadable: 'Invoice date unreadable',
+  duplicate_copy_without_original: 'Duplicate copy, original not found',
 }
 
 export function issueTypeLabel(issueType: string): string {

@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Layout } from '@/components/Layout'
 import { CustomersPage } from '@/pages/CustomersPage'
 import { InboxPage } from '@/pages/InboxPage'
+import { InvoicesPage } from '@/pages/InvoicesPage'
 import { IssuesPage } from '@/pages/IssuesPage'
 import { OrdersPage } from '@/pages/OrdersPage'
 import { StockPage } from '@/pages/StockPage'
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="upload" element={<UploadPage />} />
           <Route path="inbox" element={<InboxPage />} />
           <Route path="orders" element={<OrdersPage />} />
+          <Route path="invoices" element={<InvoicesPage />} />
           <Route path="stock" element={<StockPage />} />
           <Route path="customers" element={<CustomersPage />} />
           <Route path="issues" element={<IssuesPage />} />

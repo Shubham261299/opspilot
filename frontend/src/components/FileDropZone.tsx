@@ -1,4 +1,4 @@
-import { FileSpreadsheet, LoaderCircle } from 'lucide-react'
+import { FileSpreadsheet, LoaderCircle, type LucideIcon } from 'lucide-react'
 import { type DragEvent, useRef, useState } from 'react'
 
 import { cn } from '@/lib/utils'
@@ -8,11 +8,21 @@ interface FileDropZoneProps {
   hint: string // e.g. "or click to choose · Excel .xlsx, up to 5 MB"
   accept: string // for the file picker, e.g. ".xlsx"
   busyLabel: string | null // shown with a spinner while a file is being sent
-  onFile: (file: File) => void
+  onFile: (file: File) => void // called once per file
+  multiple?: boolean // accept several files at once
+  icon?: LucideIcon
 }
 
 /** A box you can drop a file on, click, or focus and press Enter, to choose a file. */
-export function FileDropZone({ label, hint, accept, busyLabel, onFile }: FileDropZoneProps) {
+export function FileDropZone({
+  label,
+  hint,
+  accept,
+  busyLabel,
+  onFile,
+  multiple = false,
+  icon: Icon = FileSpreadsheet,
+}: FileDropZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -23,8 +33,12 @@ export function FileDropZone({ label, hint, accept, busyLabel, onFile }: FileDro
   function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault() // stop the browser from opening the file itself
     setDragging(false)
-    const file = event.dataTransfer.files[0]
-    if (file) onFile(file)
+    choose(event.dataTransfer.files)
+  }
+
+  function choose(files: FileList | null) {
+    const chosen = Array.from(files ?? [])
+    for (const file of multiple ? chosen : chosen.slice(0, 1)) onFile(file)
   }
 
   function onDragLeave(event: DragEvent<HTMLDivElement>) {
@@ -59,7 +73,7 @@ export function FileDropZone({ label, hint, accept, busyLabel, onFile }: FileDro
       {busyLabel ? (
         <LoaderCircle className="size-7 animate-spin text-muted-foreground" aria-hidden />
       ) : (
-        <FileSpreadsheet className="size-7 text-muted-foreground" aria-hidden />
+        <Icon className="size-7 text-muted-foreground" aria-hidden />
       )}
       <p className="text-sm font-medium">{busyLabel ?? label}</p>
       <p className="text-xs text-muted-foreground">{hint}</p>
@@ -67,12 +81,13 @@ export function FileDropZone({ label, hint, accept, busyLabel, onFile }: FileDro
         ref={inputRef}
         type="file"
         accept={accept}
+        multiple={multiple}
         className="hidden"
         onClick={(event) => event.stopPropagation()} // don't bubble back to the drop zone
         onChange={(event) => {
-          const file = event.target.files?.[0]
+          const files = event.target.files
+          choose(files)
           event.target.value = '' // so choosing the same file again still triggers onChange
-          if (file) onFile(file)
         }}
       />
     </div>

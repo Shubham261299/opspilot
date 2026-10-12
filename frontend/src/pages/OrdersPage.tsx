@@ -11,6 +11,8 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useApi } from '@/hooks/useApi'
+import { useReloadOn } from '@/hooks/useLive'
+import { useScrollToHash } from '@/hooks/useScrollToHash'
 import { api, type Order, type OrderLine, type OrderStatus, type Product } from '@/lib/api'
 import { formatDateTime, plural } from '@/lib/format'
 
@@ -32,7 +34,13 @@ export function OrdersPage() {
   const orders = useApi(api.orders)
   const products = useApi(api.products)
   const enquiries = useApi(api.enquiries)
+  // A chat read, an order confirmed in the Inbox, or a line fixed in another tab.
+  useReloadOn(['upload.finished', 'proposal.decided', 'proposal.updated', 'reconnected'], () => {
+    orders.reload()
+    enquiries.reload()
+  })
   const items = orders.data?.items ?? []
+  useScrollToHash(orders.data !== null)
   const waiting = items.filter((o) => o.status === 'awaiting_confirmation')
   const done = items.filter((o) => o.status !== 'awaiting_confirmation')
 

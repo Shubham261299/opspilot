@@ -11,12 +11,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useApi } from '@/hooks/useApi'
-import { api, type Proposal, type ProposalKind, type RunChecksResult } from '@/lib/api'
+import { useReloadOn } from '@/hooks/useLive'
+import { api, invoiceNumbers, type Proposal, type ProposalKind, type RunChecksResult } from '@/lib/api'
 import { formatDate, formatDateTime, formatRupees, plural } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 const KINDS: { kind: ProposalKind; title: string; approveLabel: string }[] = [
   { kind: 'confirm_order', title: 'Customer orders (WhatsApp)', approveLabel: 'Confirm order' },
+  { kind: 'approve_invoice', title: 'Supplier invoices', approveLabel: 'Approve for payment' },
   { kind: 'reorder', title: 'Reorders', approveLabel: 'Approve purchase order' },
   { kind: 'hold_orders', title: 'Hold new orders', approveLabel: 'Approve hold' },
   { kind: 'payment_reminder', title: 'Payment reminders', approveLabel: 'Approve reminder' },
@@ -59,6 +61,11 @@ const loadPending = () => api.proposals('pending')
 
 function PendingTab() {
   const { data, error, loading, reload } = useApi(loadPending)
+  // New proposals, explanations and decisions made elsewhere show up without a refresh.
+  useReloadOn(
+    ['proposal.created', 'proposal.updated', 'proposal.explained', 'proposal.decided', 'reconnected'],
+    reload,
+  )
   const [running, setRunning] = useState(false)
   const [run, setRun] = useState<RunChecksResult | null>(null)
   const [runError, setRunError] = useState<Error | null>(null)
@@ -166,6 +173,8 @@ function DecisionDone({ proposal }: { proposal: Proposal }) {
       ? 'Rejected. Nothing was changed.'
       : proposal.kind === 'confirm_order'
         ? 'Confirmed: the order is ready to dispatch.'
+        : proposal.kind === 'approve_invoice'
+        ? 'Approved for payment.'
         : proposal.purchase_order_id
         ? `Approved: purchase order #${proposal.purchase_order_id} created.`
         : proposal.payment_reminder_id
@@ -207,7 +216,7 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
   }
 
   const n = proposal.numbers
-  const notReady = proposal.kind === 'confirm_order' && !n.ready
+  const notReady = (proposal.kind === 'confirm_order' || proposal.kind === 'approve_invoice') && !n.ready
   return (
     <Card className="gap-4">
       <CardHeader>
@@ -228,6 +237,7 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
           <CreditNumbers proposal={proposal} />
         )}
         {proposal.kind === 'confirm_order' && <OrderLines proposal={proposal} />}
+        {proposal.kind === 'approve_invoice' && <InvoicePriceCheck proposal={proposal} />}
         {proposal.draft_message && (
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
             <p className="mb-1 text-xs text-muted-foreground">Message to the customer, sent when approved:</p>
@@ -237,13 +247,19 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
       </CardContent>
       <CardFooter className="flex-col items-stretch gap-3">
         {error && <ErrorAlert error={error} title="Not saved" />}
-        {notReady && (
+        {notReady && proposal.kind === 'confirm_order' && (
           <p className="text-sm text-muted-foreground">
             Some lines need a product before the order can be confirmed.{' '}
             <Link to={`/orders#order-${proposal.order_id}`} className="underline">
               Fix them on the Orders page
             </Link>
             , or reject it.
+          </p>
+        )}
+        {notReady && proposal.kind === 'approve_invoice' && (
+          <p className="text-sm text-muted-foreground">
+            This invoice can't be paid as read (see “Before approving” above). Reject it and ask the supplier for a
+            corrected invoice.
           </p>
         )}
         <Input
@@ -303,7 +319,7 @@ function OrderLines({ proposal }: { proposal: Proposal }) {
     <div className="space-y-2 text-sm">
       <ul className="divide-y rounded-md border">
         {(n.lines ?? []).map((line) => (
-          <li key={line.line_id} className="flex items-baseline justify-between gap-3 px-3 py-1.5">
+          <li key={line.line_id} className="flex flex-wrap items-baseline justify-between gap-x-3 px-3 py-1.5">
             <span>
               <span className="tabular-nums font-medium">{line.qty}</span>{' '}
               {line.sku ? (
@@ -317,6 +333,11 @@ function OrderLines({ proposal }: { proposal: Proposal }) {
             <span className="text-xs text-muted-foreground">
               {line.matched_on === 'model' ? 'matched by AI, check it' : line.sku ? `“${line.written}”` : ''}
             </span>
+            {line.times_usual && (
+              <span className="basis-full text-xs text-amber-900 dark:text-amber-200">
+                {line.times_usual}× their usual {line.usual_qty} (from {line.usual_from}): confirm with the customer
+              </span>
+            )}
           </li>
         ))}
       </ul>
@@ -331,6 +352,53 @@ function OrderLines({ proposal }: { proposal: Proposal }) {
           Ask the customer: {question}
         </p>
       ))}
+    </div>
+  )
+}
+
+/** Each invoice line's rate against the last purchase rate (policy 4.1), and the totals. */
+function InvoicePriceCheck({ proposal }: { proposal: Proposal }) {
+  const n = invoiceNumbers(proposal)
+  return (
+    <div className="space-y-3 text-sm">
+      <ul className="divide-y rounded-md border">
+        {n.lines.map((line) => (
+          <li key={line.line_no} className="flex flex-wrap items-baseline justify-between gap-x-3 px-3 py-1.5">
+            <span>
+              <span className="tabular-nums font-medium">{Number(line.qty)}</span>{' '}
+              {line.sku ? line.name : <span className="text-destructive">“{line.description}”: no product</span>}{' '}
+              at <span className="tabular-nums">{formatRupees(line.rate)}</span>
+            </span>
+            {line.jump_percent ? (
+              <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200">
+                +{line.jump_percent}% on {formatRupees(line.last_rate ?? '0')}
+              </Badge>
+            ) : (
+              line.last_rate && (
+                <span className="text-xs text-muted-foreground">last {formatRupees(line.last_rate)}</span>
+              )
+            )}
+          </li>
+        ))}
+      </ul>
+      <dl className="grid grid-cols-3 gap-2">
+        <Figure label="Subtotal" value={formatRupees(n.subtotal)} />
+        <Figure label="GST" value={formatRupees(n.gst_amount)} />
+        <Figure label="To pay" value={formatRupees(n.grand_total)} strong />
+      </dl>
+      {n.arithmetic_problems.map((problem) => (
+        <p key={problem} className="text-destructive">
+          {problem}
+        </p>
+      ))}
+      {n.marked_duplicate && (
+        <p className="text-amber-900 dark:text-amber-200">
+          Stamped DUPLICATE COPY, but no original was uploaded. Check it wasn't paid outside OpsPilot.
+        </p>
+      )}
+      <Link to={`/invoices#invoice-${proposal.invoice_id}`} className="text-xs underline">
+        See the whole invoice
+      </Link>
     </div>
   )
 }
@@ -391,7 +459,8 @@ const loadHistory = async (): Promise<Proposal[]> => {
 }
 
 function HistoryTab() {
-  const { data, error, loading } = useApi(loadHistory)
+  const { data, error, loading, reload } = useApi(loadHistory)
+  useReloadOn(['proposal.decided', 'reconnected'], reload)
   if (error) return <ErrorAlert error={error} title="Couldn't load the history" />
   if (loading && !data) return <Skeleton className="h-40 w-full" />
   if (!data || data.length === 0) {
