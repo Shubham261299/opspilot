@@ -368,7 +368,17 @@ inv.append(("invoice_brightline_BL-0874.pdf","SUP03","BL-0874",TODAY-dt.timedelt
 lines3=[("PVC Conduit Pipe 20 mm (3 mtr)",200,PM["ST-0026"]["cost_price"]),("Bend 20mm",500,PM["ST-0028"]["cost_price"]),("Junction Box 2 way 20mm",300,PM["ST-0029"]["cost_price"])]
 inv.append(("invoice_sai_conduits_SC-118.pdf","SUP04","SC-118",TODAY-dt.timedelta(days=3),lines3,None))
 inv.append(("invoice_sai_conduits_SC-118_copy.pdf","SUP04","SC-118",TODAY-dt.timedelta(days=3),lines3,"DUPLICATE COPY"))
-for f,s,no,d,l,n in inv: invoice_pdf(f,SUP[s],no,d,l,n)
+# What each invoice really contains, for the answer key (the SKUs are the products behind lines1-3).
+inv_skus={"invoice_kiran_cables_KC-2291.pdf":["ST-0002","ST-0003","ST-0004"],
+  "invoice_brightline_BL-0874.pdf":["ST-0017","ST-0018","ST-0020"],
+  "invoice_sai_conduits_SC-118.pdf":["ST-0026","ST-0028","ST-0029"],
+  "invoice_sai_conduits_SC-118_copy.pdf":["ST-0026","ST-0028","ST-0029"]}
+expected_invoices=[]
+for f,s,no,d,l,n in inv:
+    total=invoice_pdf(f,SUP[s],no,d,l,n); sub=round(sum(q*r for _,q,r in l),2)
+    expected_invoices.append(dict(file=f,supplier_code=s,invoice_no=no,invoice_date=d.isoformat(),
+        lines=[dict(sku=k,qty=q,rate=r) for k,(_,q,r) in zip(inv_skus[f],l)],
+        subtotal=sub,gst_amount=round(total-sub,2),grand_total=round(total,2),marked_duplicate=(n=="DUPLICATE COPY")))
 
 # ---------------- company policy PDF ----------------
 policy=[
@@ -428,7 +438,7 @@ anomalies=[
 key=dict(as_of=TODAY.isoformat(),policy=dict(safety_days=SAFETY_DAYS,cover_days=COVER_DAYS),
   expected_reorders=expected_reorders,open_purchase_orders=[dict(sku=k,qty=v,note="Mentioned in stock register remarks") for k,v in open_po.items()],
   expected_payment_actions=pay_actions,expected_orders=[dict(customer=o["customer"],items=[dict(sku=a,qty=b) for a,b in o["items"]],note=o["note"]) for o in expected_orders],
-  non_orders=[dict(from_=a,why=b) for a,b in non_orders],anomalies=anomalies,data_issues=issues)
+  non_orders=[dict(from_=a,why=b) for a,b in non_orders],anomalies=anomalies,expected_invoices=expected_invoices,data_issues=issues)
 (OUT/"answer_key.json").write_text(json.dumps(key,indent=2,default=str),encoding="utf-8")
 print("reorders",len(expected_reorders),"pay actions",len(pay_actions),"orders",len(expected_orders),"issues",len(issues),"sales rows",len(sales))
 for r in expected_reorders: print(r["sku"],r["name"][:28],r["on_hand"],r["reorder_point"],r["reorder_qty"])

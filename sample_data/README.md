@@ -22,4 +22,5 @@ Every name, number, phone and email here is invented, for the OpsPilot demo only
 - `expected_payment_actions`: 10 customers, with `SEND_REMINDER` or `HOLD_NEW_ORDERS`.
 - `expected_orders`: 16 orders the WhatsApp parser should produce (after applying corrections), plus 4 messages that are **not** orders.
 - `anomalies`: 3 (abnormal order size, invoice price jump, duplicate invoice).
+- `expected_invoices`: what each of the 4 invoice PDFs contains (supplier, number, date, every line's SKU, quantity and rate, totals), for the invoice eval.
 - `data_issues`: 15 planted data problems the intake should report.

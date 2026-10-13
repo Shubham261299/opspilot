@@ -1,0 +1,110 @@
+{
+  "model": "ollama_chat/qwen2.5:14b",
+  "recorded_at": "2026-10-13T10:29:25",
+  "expected_summary": {
+    "model_calls": 21,
+    "orders_fully_right": 15,
+    "orders_expected": 16,
+    "lines_exact": 44,
+    "lines_expected": 45,
+    "lines_wrong_qty": 0,
+    "lines_missing": 1,
+    "lines_extra": 0,
+    "lines_sent_to_review": 1,
+    "non_orders_right": 4,
+    "non_orders_expected": 4,
+    "orders_for_unexpected_senders": [],
+    "issues_by_type": {
+      "needs_clarification": 2,
+      "product_matched_by_llm": 2,
+      "unit_written_differently": 1,
+      "unmatched_product": 1
+    }
+  },
+  "entries": {
+    "e2ab2d75146a9df7": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\n      \"product\": \"1.5mm wire\",\n      \"qty\": 15,\n      \"unit\": \"box\"\n    },\n    {\n      \"product\": \"gitti\",\n      \"qty\": 10,\n      \"unit\": \"pkt\"\n    },\n    {\n      \"product\": \"black tape\",\n      \"qty\": 50,\n      \"unit\": null\n    }\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "5950b1c9c91819ea": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\n      \"product\": \"6a switch\",\n      \"qty\": 150,\n      \"unit\": \"pcs\"\n    },\n    {\n      \"product\": \"6a socket\",\n      \"qty\": 100,\n      \"unit\": \"pcs\"\n    },\n    {\n      \"product\": \"plate 3m\",\n      \"qty\": 50,\n      \"unit\": null\n    }\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "0ffc08c133e49838": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\"product\": \"9w bulb\", \"qty\": 300, \"unit\": null},\n    {\"product\": \"12w bulb\", \"qty\": 150, \"unit\": null},\n    {\"product\": \"tube light\", \"qty\": 40, \"unit\": null}\n  ],\n  \"enquiries\": [],\n  \"unclear\": [\n    \"ye wala panel bhi 20 chahiye (refers to a photo)\"\n  ]\n}"
+    },
+    "33e80fbbcf8761df": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\n      \"product\": \"16 amp mcb\",\n      \"qty\": 24,\n      \"unit\": \"nos\"\n    },\n    {\n      \"product\": \"6 amp mcb\",\n      \"qty\": 12,\n      \"unit\": \"nos\"\n    },\n    {\n      \"product\": \"DB 8 way\",\n      \"qty\": 2,\n      \"unit\": \"nos\"\n    }\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "3727996dc5041f95": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\n      \"product\": \"LED strip\",\n      \"qty\": 10,\n      \"unit\": null\n    },\n    {\n      \"product\": \"flood light 50w\",\n      \"qty\": 5,\n      \"unit\": null\n    }\n  ],\n  \"enquiries\": [\n    \"do you have smart wifi bulbs?\"\n  ],\n  \"unclear\": []\n}"
+    },
+    "41d8ae01dd867a7a": {
+      "purpose": "whatsapp_match",
+      "answer": "{\n  \"picks\": [\n    {\n      \"written\": \"flood light 50w\",\n      \"sku\": \"ST-0023\",\n      \"sure\": true\n    }\n  ]\n}"
+    },
+    "c640cc28b21d948e": {
+      "purpose": "whatsapp_read",
+      "answer": "{\"order_lines\":[{\"product\":\"20mm pipe\",\"qty\":100,\"unit\":\"length\"},{\"product\":\"bend 200\",\"qty\":1,\"unit\":null},{\"product\":\"jn box\",\"qty\":100,\"unit\":\"nos\"}],\"enquiries\":[],\"unclear\":[]}"
+    },
+    "5c98976ee3fb159b": {
+      "purpose": "whatsapp_match",
+      "answer": "{\n  \"picks\": [\n    {\"written\": \"bend 200\", \"sku\": \"null\", \"sure\": false},\n    {\"written\": \"jn box\", \"sku\": \"ST-0029\", \"sure\": true}\n  ]\n}"
+    },
+    "040857cd39df3304": {
+      "purpose": "whatsapp_read",
+      "answer": "{\"order_lines\":[{\"product\":\"2.5 taar\",\"qty\":200,\"unit\":\"coil\"}],\"enquiries\":[],\"unclear\":[]}"
+    },
+    "de16c66575203567": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\"product\": \"rccb 40\", \"qty\": 2, \"unit\": null},\n    {\"product\": \"32a dp mcb\", \"qty\": 4, \"unit\": null},\n    {\"product\": \"changeover 63\", \"qty\": 1, \"unit\": null}\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "32030d39bd8cb259": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\"product\": \"regulator\", \"qty\": 10, \"unit\": null},\n    {\"product\": \"bell push\", \"qty\": 10, \"unit\": null},\n    {\"product\": \"usb socket\", \"qty\": 5, \"unit\": null}\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "de48002a7898ffca": {
+      "purpose": "whatsapp_read",
+      "answer": "{\"order_lines\":[],\"enquiries\":[],\"unclear\":[]}"
+    },
+    "489633cf91387304": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\"product\": \"Casing 1 inch\", \"qty\": 40, \"unit\": null},\n    {\"product\": \"3m box\", \"qty\": 30, \"unit\": null},\n    {\"product\": \"6m box\", \"qty\": 20, \"unit\": null},\n    {\"product\": \"6m plate\", \"qty\": 20, \"unit\": null}\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "ca1c929a25607417": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\"product\": \"extension board\", \"qty\": 10, \"unit\": \"nos\"},\n    {\"product\": \"multiplug\", \"qty\": 50, \"unit\": \"nos\"},\n    {\"product\": \"tester\", \"qty\": 20, \"unit\": \"nos\"},\n    {\"product\": \"4mm wire\", \"qty\": 1, \"unit\": \"coil\"}\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "1252b4b83a2e5a9f": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [],\n  \"enquiries\": [\"Pls send rate list for LED panels\"],\n  \"unclear\": []\n}"
+    },
+    "4673b92c8a14935b": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\n      \"product\": \"6 mm taar\",\n      \"qty\": 5,\n      \"unit\": \"coil\"\n    },\n    {\n      \"product\": \"earth wire\",\n      \"qty\": 10,\n      \"unit\": \"kg\"\n    }\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "3a4442d3b9801aeb": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\"product\": \"18w square panel\", \"qty\": 15, \"unit\": null},\n    {\"product\": \"15w panel\", \"qty\": 25, \"unit\": null},\n    {\"product\": \"50w flood\", \"qty\": 3, \"unit\": null}\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "fc359434da616a0f": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\n      \"product\": \"cat6\",\n      \"qty\": 1,\n      \"unit\": \"box\"\n    },\n    {\n      \"product\": \"rg6\",\n      \"qty\": 2,\n      \"unit\": \"coil\"\n    }\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    },
+    "556818f893c8de6a": {
+      "purpose": "whatsapp_read",
+      "answer": "{\"order_lines\":[{\"product\":\"black tape\",\"qty\":100,\"unit\":null},{\"product\":\"red tape\",\"qty\":20,\"unit\":null},{\"product\":\"cable tie\",\"qty\":10,\"unit\":\"pkt\"},{\"product\":\"clip\",\"qty\":10,\"unit\":\"pkt\"}],\"enquiries\":[],\"unclear\":[\"[photo]\"]}"
+    },
+    "0f730f50eb15d5d5": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [],\n  \"enquiries\": [\"Solar panel 2 kw ka rate kya hai?\"],\n  \"unclear\": []\n}"
+    },
+    "7c212cb842f5eb59": {
+      "purpose": "whatsapp_read",
+      "answer": "{\n  \"order_lines\": [\n    {\n      \"product\": \"9w bulb\",\n      \"qty\": 100,\n      \"unit\": null\n    },\n    {\n      \"product\": \"door bell\",\n      \"qty\": 5,\n      \"unit\": null\n    }\n  ],\n  \"enquiries\": [],\n  \"unclear\": []\n}"
+    }
+  }
+}

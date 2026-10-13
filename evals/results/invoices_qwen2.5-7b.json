@@ -1,0 +1,48 @@
+{
+  "summary": {
+    "model": "ollama_chat/qwen2.5:7b",
+    "run_at": "2026-10-13T10:48:46",
+    "seconds": 175,
+    "model_calls": 6,
+    "invoices_fully_right": 4,
+    "invoices_expected": 4,
+    "lines_exact": 12,
+    "lines_expected": 12,
+    "invoices_not_read": 0,
+    "lines_read_from_table": 4
+  },
+  "details": [
+    {
+      "file": "invoice_kiran_cables_KC-2291.pdf",
+      "all_right": true,
+      "lines_exact": 3,
+      "lines_expected": 3,
+      "lines_read_by": "table",
+      "problems": []
+    },
+    {
+      "file": "invoice_brightline_BL-0874.pdf",
+      "all_right": true,
+      "lines_exact": 3,
+      "lines_expected": 3,
+      "lines_read_by": "table",
+      "problems": []
+    },
+    {
+      "file": "invoice_sai_conduits_SC-118.pdf",
+      "all_right": true,
+      "lines_exact": 3,
+      "lines_expected": 3,
+      "lines_read_by": "table",
+      "problems": []
+    },
+    {
+      "file": "invoice_sai_conduits_SC-118_copy.pdf",
+      "all_right": true,
+      "lines_exact": 3,
+      "lines_expected": 3,
+      "lines_read_by": "table",
+      "problems": []
+    }
+  ]
+}

@@ -58,14 +58,20 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
 
+      # ../evals is outside backend/, so it is named here and told to use backend's settings.
       - name: Lint (ruff)
-        run: ruff check .
+        run: ruff check . ../evals --config pyproject.toml
 
       - name: Check formatting (ruff)
-        run: ruff format --check .
+        run: ruff format --check . ../evals --config pyproject.toml
 
       - name: Tests (pytest)
         run: pytest -v # -v prints every test's name, so the log shows exactly what ran
+
+      # No model in CI: the evals play back the answers recorded from the real model (evals/README.md)
+      # and check the reading code and the scoring still give the recorded score.
+      - name: Evals (replayed from recordings)
+        run: pytest -v ../evals
 
   # No `needs:` between the two jobs, so they run at the same time, each on its own fresh machine.
   frontend:

@@ -1,28 +1,28 @@
 {
   "summary": {
-    "model": "ollama_chat/qwen2.5:7b",
-    "run_at": "2026-10-06T10:12:15",
-    "seconds": 215,
-    "model_calls": 24,
-    "orders_fully_right": 14,
+    "model": "ollama_chat/qwen2.5:14b",
+    "run_at": "2026-10-13T10:36:28",
+    "seconds": 423,
+    "model_calls": 21,
+    "orders_fully_right": 15,
     "orders_expected": 16,
     "lines_exact": 44,
     "lines_expected": 45,
     "lines_wrong_qty": 0,
     "lines_missing": 1,
     "lines_extra": 0,
-    "lines_sent_to_review": 2,
+    "lines_sent_to_review": 1,
     "non_orders_right": 4,
     "non_orders_expected": 4,
     "orders_for_unexpected_senders": [],
     "issues_by_type": {
-      "needs_clarification": 1,
-      "product_matched_by_llm": 4,
+      "needs_clarification": 2,
+      "product_matched_by_llm": 2,
       "unit_written_differently": 1,
-      "unmatched_product": 2
+      "unmatched_product": 1
     }
   },
-  "orders": [
+  "details": [
     {
       "customer": "Ramesh Electricals",
       "all_right": true,
@@ -45,15 +45,13 @@
     },
     {
       "customer": "New Light House",
-      "all_right": false,
+      "all_right": true,
       "exact": 3,
       "expected": 3,
       "wrong_qty": [],
       "missing": [],
       "extra": [],
-      "unmatched": [
-        "panel"
-      ]
+      "unmatched": []
     },
     {
       "customer": "Balaji Electricals",
@@ -77,13 +75,17 @@
     },
     {
       "customer": "Mahalaxmi Traders",
-      "all_right": true,
-      "exact": 3,
+      "all_right": false,
+      "exact": 2,
       "expected": 3,
       "wrong_qty": [],
-      "missing": [],
+      "missing": [
+        "ST-0028"
+      ],
       "extra": [],
-      "unmatched": []
+      "unmatched": [
+        "bend 200"
+      ]
     },
     {
       "customer": "Royal Hardware",
@@ -117,17 +119,13 @@
     },
     {
       "customer": "Pooja Electricals",
-      "all_right": false,
-      "exact": 3,
+      "all_right": true,
+      "exact": 4,
       "expected": 4,
       "wrong_qty": [],
-      "missing": [
-        "ST-0030"
-      ],
+      "missing": [],
       "extra": [],
-      "unmatched": [
-        "1 inch"
-      ]
+      "unmatched": []
     },
     {
       "customer": "City Electricals",

@@ -1,0 +1,35 @@
+{
+  "model": "ollama_chat/qwen2.5:14b",
+  "recorded_at": "2026-10-13T10:36:28",
+  "expected_summary": {
+    "model_calls": 6,
+    "invoices_fully_right": 4,
+    "invoices_expected": 4,
+    "lines_exact": 12,
+    "lines_expected": 12,
+    "invoices_not_read": 0,
+    "lines_read_from_table": 4
+  },
+  "entries": {
+    "c4ee7163ed1d4db6": {
+      "purpose": "invoice_read",
+      "answer": "{\n  \"supplier_name\": \"KIRAN CABLES PVT LTD\",\n  \"supplier_gstin\": \"27AAAAA1913A1Z8\",\n  \"invoice_no\": \"KC/26-27/2291\",\n  \"invoice_date\": \"12.09.2026\",\n  \"lines\": [\n    {\n      \"description\": \"FR PVC Wire 1.5 sqmm 90m\",\n      \"qty\": \"90\",\n      \"rate\": \"1,620.00\",\n      \"amount\": \"32,400.00\"\n    },\n    {\n      \"description\": \"FR PVC Wire 2.5 sqmm 90m\",\n      \"qty\": \"90\",\n      \"rate\": \"2,580.00\",\n      \"amount\": \"51,600.00\"\n    },\n    {\n      \"description\": \"FR PVC Wire 4.0 sqmm 90m\",\n      \"qty\": \"40\",\n      \"rate\": \"4,120.00\",\n      \"amount\": \"20,600.00\"\n    }\n  ],\n  \"subtotal\": \"104,600.00\",\n  \"gst_rate_percent\": \"18\",\n  \"gst_amount\": \"18,828.00\",\n  \"grand_total\": \"123,428.00\",\n  \"marked_duplicate\": false,\n  \"notes\": [\n    \"Payment terms: 30 days.\",\n    \"Subject to Pune jurisdiction.\",\n    \"E.&O.E.\"\n  ]\n}"
+    },
+    "ffd04dcdfa890251": {
+      "purpose": "invoice_read",
+      "answer": "{\n  \"supplier_name\": \"BRIGHTLINE LED CO.\",\n  \"supplier_gstin\": \"27AAAAA1956A1Z3\",\n  \"invoice_no\": \"BL-0874\",\n  \"invoice_date\": \"19.09.2026\",\n  \"lines\": [\n    {\n      \"description\": \"LED Bulb 9W Cool White\",\n      \"qty\": \"200\",\n      \"rate\": \"63.36\",\n      \"amount\": \"12,672.00\"\n    },\n    {\n      \"description\": \"LED Bulb 12W Cool White\",\n      \"qty\": \"100\",\n      \"rate\": \"62.00\",\n      \"amount\": \"6,200.00\"\n    },\n    {\n      \"description\": \"LED Tube Light 20W 4ft\",\n      \"qty\": \"50\",\n      \"rate\": \"135.00\",\n      \"amount\": \"6,750.00\"\n    }\n  ],\n  \"subtotal\": \"25,622.00\",\n  \"gst_rate_percent\": \"18\",\n  \"gst_amount\": \"4,611.96\",\n  \"grand_total\": \"30,233.96\",\n  \"marked_duplicate\": false,\n  \"notes\": [\"revised pricing applicable from this invoice\", \"Payment terms: 30 days. Subject to Pune jurisdiction. E.&O.E.\"]\n}"
+    },
+    "10d3a919f689f6c0": {
+      "purpose": "invoice_read",
+      "answer": "{\n  \"supplier_name\": \"SAI CONDUITS & PIPES\",\n  \"supplier_gstin\": \"27AAAAA6514A1Z1\",\n  \"invoice_no\": \"SC-118\",\n  \"invoice_date\": \"21.09.2026\",\n  \"lines\": [\n    {\n      \"description\": \"PVC Conduit Pipe 20 mm (3 mtr)\",\n      \"qty\": \"200\",\n      \"rate\": \"38.00\",\n      \"amount\": \"7,600.00\"\n    },\n    {\n      \"description\": \"Bend 20mm\",\n      \"qty\": \"500\",\n      \"rate\": \"6.00\",\n      \"amount\": \"3,000.00\"\n    },\n    {\n      \"description\": \"Junction Box 2 way 20mm\",\n      \"qty\": \"300\",\n      \"rate\": \"9.00\",\n      \"amount\": \"2,700.00\"\n    }\n  ],\n  \"subtotal\": \"13,300.00\",\n  \"gst_rate_percent\": \"18\",\n  \"gst_amount\": \"2,394.00\",\n  \"grand_total\": \"15,694.00\",\n  \"marked_duplicate\": false,\n  \"notes\": [\n    \"Payment terms: 15 days.\",\n    \"Subject to Pune jurisdiction.\",\n    \"E.&O.E.\"\n  ]\n}"
+    },
+    "301301d474f51d17": {
+      "purpose": "invoice_match",
+      "answer": "{\n  \"picks\": [\n    {\"written\": \"PVC Conduit Pipe 20 mm (3 mtr)\", \"sku\": \"ST-0026\", \"sure\": true},\n    {\"written\": \"Junction Box 2 way 20mm\", \"sku\": \"ST-0029\", \"sure\": true}\n  ]\n}"
+    },
+    "ca0c146ac9fa323d": {
+      "purpose": "invoice_read",
+      "answer": "{\n  \"supplier_name\": \"SAI CONDUITS & PIPES\",\n  \"supplier_gstin\": \"27AAAAA8479A1Z7\",\n  \"invoice_no\": \"SC-118\",\n  \"invoice_date\": \"21.09.2026\",\n  \"lines\": [\n    {\n      \"description\": \"PVC Conduit Pipe 20 mm (3 mtr)\",\n      \"qty\": \"200\",\n      \"rate\": \"38.00\",\n      \"amount\": \"7,600.00\"\n    },\n    {\n      \"description\": \"Bend 20mm\",\n      \"qty\": \"500\",\n      \"rate\": \"6.00\",\n      \"amount\": \"3,000.00\"\n    },\n    {\n      \"description\": \"Junction Box 2 way 20mm\",\n      \"qty\": \"300\",\n      \"rate\": \"9.00\",\n      \"amount\": \"2,700.00\"\n    }\n  ],\n  \"subtotal\": \"13,300.00\",\n  \"gst_rate_percent\": \"18\",\n  \"gst_amount\": \"2,394.00\",\n  \"grand_total\": \"15,694.00\",\n  \"marked_duplicate\": true,\n  \"notes\": [\n    \"DUPLICATE COPY\",\n    \"Payment terms: 15 days. Subject to Pune jurisdiction. E.&O.E.\"\n  ]\n}"
+    }
+  }
+}

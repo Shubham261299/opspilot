@@ -1,28 +1,28 @@
 {
   "summary": {
-    "model": "ollama_chat/qwen2.5:14b",
-    "run_at": "2026-10-06T10:19:35",
-    "seconds": 436,
-    "model_calls": 21,
-    "orders_fully_right": 15,
+    "model": "ollama_chat/qwen2.5:7b",
+    "run_at": "2026-10-13T10:45:51",
+    "seconds": 209,
+    "model_calls": 24,
+    "orders_fully_right": 13,
     "orders_expected": 16,
-    "lines_exact": 44,
+    "lines_exact": 43,
     "lines_expected": 45,
     "lines_wrong_qty": 0,
-    "lines_missing": 1,
-    "lines_extra": 0,
-    "lines_sent_to_review": 1,
+    "lines_missing": 2,
+    "lines_extra": 1,
+    "lines_sent_to_review": 2,
     "non_orders_right": 4,
     "non_orders_expected": 4,
     "orders_for_unexpected_senders": [],
     "issues_by_type": {
-      "needs_clarification": 2,
-      "product_matched_by_llm": 2,
+      "needs_clarification": 1,
+      "product_matched_by_llm": 4,
       "unit_written_differently": 1,
-      "unmatched_product": 1
+      "unmatched_product": 2
     }
   },
-  "orders": [
+  "details": [
     {
       "customer": "Ramesh Electricals",
       "all_right": true,
@@ -35,23 +35,29 @@
     },
     {
       "customer": "Om Sai Hardware",
-      "all_right": true,
-      "exact": 3,
+      "all_right": false,
+      "exact": 2,
       "expected": 3,
       "wrong_qty": [],
-      "missing": [],
-      "extra": [],
+      "missing": [
+        "ST-0035"
+      ],
+      "extra": [
+        "ST-0009"
+      ],
       "unmatched": []
     },
     {
       "customer": "New Light House",
-      "all_right": true,
+      "all_right": false,
       "exact": 3,
       "expected": 3,
       "wrong_qty": [],
       "missing": [],
       "extra": [],
-      "unmatched": []
+      "unmatched": [
+        "panel"
+      ]
     },
     {
       "customer": "Balaji Electricals",
@@ -75,17 +81,13 @@
     },
     {
       "customer": "Mahalaxmi Traders",
-      "all_right": false,
-      "exact": 2,
+      "all_right": true,
+      "exact": 3,
       "expected": 3,
       "wrong_qty": [],
-      "missing": [
-        "ST-0028"
-      ],
+      "missing": [],
       "extra": [],
-      "unmatched": [
-        "bend 200"
-      ]
+      "unmatched": []
     },
     {
       "customer": "Royal Hardware",
@@ -119,13 +121,17 @@
     },
     {
       "customer": "Pooja Electricals",
-      "all_right": true,
-      "exact": 4,
+      "all_right": false,
+      "exact": 3,
       "expected": 4,
       "wrong_qty": [],
-      "missing": [],
+      "missing": [
+        "ST-0030"
+      ],
       "extra": [],
-      "unmatched": []
+      "unmatched": [
+        "1 inch"
+      ]
     },
     {
       "customer": "City Electricals",

@@ -553,6 +553,116 @@
       "detail": "Sai Conduits invoice SC-118 received twice (second PDF marked DUPLICATE COPY) - rule 4.2."
     }
   ],
+  "expected_invoices": [
+    {
+      "file": "invoice_kiran_cables_KC-2291.pdf",
+      "supplier_code": "SUP01",
+      "invoice_no": "KC/26-27/2291",
+      "invoice_date": "2026-09-12",
+      "lines": [
+        {
+          "sku": "ST-0002",
+          "qty": 20,
+          "rate": 1620
+        },
+        {
+          "sku": "ST-0003",
+          "qty": 20,
+          "rate": 2580
+        },
+        {
+          "sku": "ST-0004",
+          "qty": 5,
+          "rate": 4120
+        }
+      ],
+      "subtotal": 104600,
+      "gst_amount": 18828.0,
+      "grand_total": 123428.0,
+      "marked_duplicate": false
+    },
+    {
+      "file": "invoice_brightline_BL-0874.pdf",
+      "supplier_code": "SUP03",
+      "invoice_no": "BL-0874",
+      "invoice_date": "2026-09-19",
+      "lines": [
+        {
+          "sku": "ST-0017",
+          "qty": 200,
+          "rate": 63.36
+        },
+        {
+          "sku": "ST-0018",
+          "qty": 100,
+          "rate": 62
+        },
+        {
+          "sku": "ST-0020",
+          "qty": 50,
+          "rate": 135
+        }
+      ],
+      "subtotal": 25622.0,
+      "gst_amount": 4611.96,
+      "grand_total": 30233.96,
+      "marked_duplicate": false
+    },
+    {
+      "file": "invoice_sai_conduits_SC-118.pdf",
+      "supplier_code": "SUP04",
+      "invoice_no": "SC-118",
+      "invoice_date": "2026-09-21",
+      "lines": [
+        {
+          "sku": "ST-0026",
+          "qty": 200,
+          "rate": 38
+        },
+        {
+          "sku": "ST-0028",
+          "qty": 500,
+          "rate": 6
+        },
+        {
+          "sku": "ST-0029",
+          "qty": 300,
+          "rate": 9
+        }
+      ],
+      "subtotal": 13300,
+      "gst_amount": 2394.0,
+      "grand_total": 15694.0,
+      "marked_duplicate": false
+    },
+    {
+      "file": "invoice_sai_conduits_SC-118_copy.pdf",
+      "supplier_code": "SUP04",
+      "invoice_no": "SC-118",
+      "invoice_date": "2026-09-21",
+      "lines": [
+        {
+          "sku": "ST-0026",
+          "qty": 200,
+          "rate": 38
+        },
+        {
+          "sku": "ST-0028",
+          "qty": 500,
+          "rate": 6
+        },
+        {
+          "sku": "ST-0029",
+          "qty": 300,
+          "rate": 9
+        }
+      ],
+      "subtotal": 13300,
+      "gst_amount": 2394.0,
+      "grand_total": 15694.0,
+      "marked_duplicate": true
+    }
+  ],
   "data_issues": [
     {
       "file": "stock_register.xlsx",
