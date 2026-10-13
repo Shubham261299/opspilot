@@ -625,6 +625,26 @@ asked to) or a migration is needed; embed_texts() refuses other widths with a cl
 is Debian (glibc), whose text sorting can differ. The dev database was dumped with `pg_dump`, the
 volume recreated and restored (37 proposals, 4 invoices and 30 audit rows came back unchanged).
 
+## 044 · A proposal cites the rules its code applied, not the rules a search finds (2026-10-13)
+
+**Context:** Week 6 should let the owner see which policy rule a proposal follows. The policy is
+now searchable by meaning (decision 043), so a proposal could look up "its" rule by similarity.
+**Options:** Retrieve the nearest rules for each proposal's text · a fixed mapping from what the
+proposal is (and which flags it raised) to rule numbers.
+**Choice:** A fixed mapping in `domain/policy_rules.py`. A reorder follows 1.2 to 1.4 (and 1.5
+when above the owner's limit), a reminder 2.3 and 2.5, a hold 2.4, an order 2.4, 3.1 and 3.2 for
+the flags it raised, an invoice 4.1 and 4.2. Each citation carries a plain-words `why` built
+from the proposal's own figures ("a bill is 33 days overdue (more than 30)"); the API adds the
+rule's stored wording when the policy has been uploaded, and still names the rule when it has
+not. A test fails if a cited number no longer exists in the sample policy. Search stays a
+separate feature (`GET /policy/search`, the Policy page) and is measured by its own eval.
+**Why:** The code that made the proposal knows exactly which rule it applied; asking a similarity
+search to guess it back can cite a neighbouring rule on a card the owner relies on (the same
+reason quantities come from code, not from the model). Search suits open questions; citations
+are facts. The cost: the mapping must be updated when a new kind of proposal or rule is added,
+which the test and review catch. Orders' own cards in the Orders list don't carry citations
+(their figures live on the proposal); the Inbox card of the order does.
+
 ---
 
 ## Ideas

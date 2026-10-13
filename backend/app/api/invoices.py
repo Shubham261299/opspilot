@@ -4,8 +4,10 @@ from typing import Any, Literal, cast
 from fastapi import APIRouter
 
 from app.api.deps import SessionDep
+from app.api.proposals import policy_citations
 from app.api.schemas import InvoiceLineOut, InvoiceOut, InvoicesOut
 from app.db.queries import list_invoices
+from app.policy_search import rule_texts
 
 router = APIRouter(tags=["invoices"])
 InvoiceStatus = Literal["awaiting_approval", "approved_for_payment", "rejected", "duplicate"]
@@ -16,6 +18,7 @@ async def get_invoices(session: SessionDep) -> InvoicesOut:
     """Supplier invoices read from PDFs, newest first. Each line has our cost price and the
     price check from its proposal (the same figures the owner approves on)."""
     items = []
+    rules = await rule_texts(session)
     for view in await list_invoices(session):
         invoice = view.invoice
         numbers = view.proposal.numbers if view.proposal else {}
@@ -56,6 +59,9 @@ async def get_invoices(session: SessionDep) -> InvoicesOut:
                 proposal_id=view.proposal.id if view.proposal else None,
                 ready=numbers.get("ready"),
                 price_jumps=numbers.get("price_jumps"),
+                policy=policy_citations(view.proposal.kind, numbers, rules)
+                if view.proposal
+                else [],
                 created_at=invoice.created_at,
             )
         )

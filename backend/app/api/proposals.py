@@ -7,6 +7,7 @@ from app.api.deps import AgentsDep, SessionDep, TodayDep
 from app.api.errors import ApiError
 from app.api.schemas import (
     DecisionIn,
+    PolicyCitationOut,
     ProposalKind,
     ProposalOut,
     ProposalsOut,
@@ -25,6 +26,8 @@ from app.db.queries import (
     list_proposals,
     list_purchase_orders,
 )
+from app.domain.policy_rules import citations_for
+from app.policy_search import RuleText, rule_texts
 from app.proposals import decisions
 from app.proposals.checks import run_checks
 from app.proposals.errors import NotReady
@@ -62,7 +65,8 @@ async def get_proposals(
     session: SessionDep, status: Annotated[ProposalStatus, Query()] = "pending"
 ) -> ProposalsOut:
     """Proposals with one status: pending ones are the Approval Inbox."""
-    return ProposalsOut(items=[_out(view) for view in await list_proposals(session, status)])
+    rules = await rule_texts(session)
+    return ProposalsOut(items=[_out(view, rules) for view in await list_proposals(session, status)])
 
 
 @router.post("/proposals/{proposal_id}/approve", responses=_DECISION_ERRORS)
@@ -135,10 +139,29 @@ async def _decide(
         raise ApiError(409, exc.code, exc.message) from exc
     view = await get_proposal_view(session, proposal_id)
     assert view is not None
-    return _out(view)
+    return _out(view, await rule_texts(session))
 
 
-def _out(view: ProposalView) -> ProposalOut:
+def policy_citations(
+    kind: str, numbers: dict[str, object], rules: dict[str, RuleText]
+) -> list[PolicyCitationOut]:
+    """The rules a proposal follows (fixed mapping), with each rule's stored wording if the
+    policy has been uploaded."""
+    cited = []
+    for citation in citations_for(kind, numbers):
+        rule = rules.get(citation.code)
+        cited.append(
+            PolicyCitationOut(
+                code=citation.code,
+                why=citation.why,
+                section_title=rule.section_title if rule else None,
+                text=rule.text if rule else None,
+            )
+        )
+    return cited
+
+
+def _out(view: ProposalView, rules: dict[str, RuleText]) -> ProposalOut:
     proposal = view.proposal
     if view.sku is not None:
         subject = ProposalSubjectOut(type="product", code=view.sku, name=view.product_name or "")
@@ -178,4 +201,5 @@ def _out(view: ProposalView) -> ProposalOut:
         explanation=proposal.explanation,
         explained_by=proposal.explained_by,
         draft_message=proposal.draft_message,
+        policy=policy_citations(proposal.kind, proposal.numbers, rules),
     )

@@ -74,6 +74,9 @@ async def test_an_invoice_pdf_is_read_checked_and_saved(client: AsyncClient, pdf
     assert (first["last_rate"], first["jump_percent"]) == ("48.00", "32.0")
     assert invoice["proposal_id"] is not None
     assert (invoice["ready"], invoice["price_jumps"]) == (True, 1)
+    # The rules its proposal follows: the price check (with this invoice's jump) and duplicates.
+    assert [c["code"] for c in invoice["policy"]] == ["4.1", "4.2"]
+    assert invoice["policy"][0]["why"] == "1 rate is more than 10% above the last purchase rate"
     issues = (await client.get("/issues", params={"upload_id": upload_id})).json()["items"]
     assert issues == []  # every figure agrees
 

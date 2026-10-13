@@ -152,6 +152,38 @@ ProposalKind = Literal[
 ProposalStatus = Literal["pending", "approved", "rejected", "superseded"]
 
 
+class PolicyRuleOut(BaseModel):
+    code: str = Field(description="The rule's number as printed in the policy, e.g. 2.4")
+    section_no: int
+    section_title: str
+    text: str
+
+
+class PolicyOut(BaseModel):
+    items: list[PolicyRuleOut]
+    embedding_model: str | None = Field(description="The model that embedded the rules")
+    uploaded_at: datetime | None
+
+
+class PolicySearchHitOut(PolicyRuleOut):
+    score: float = Field(description="Cosine similarity to the question: ranks, not a probability")
+
+
+class PolicySearchOut(BaseModel):
+    query: str
+    embedding_model: str | None = Field(description="null: no policy has been uploaded yet")
+    items: list[PolicySearchHitOut]
+
+
+class PolicyCitationOut(BaseModel):
+    """A policy rule a proposal follows, chosen by code (domain/policy_rules.py), not by search."""
+
+    code: str
+    why: str = Field(description="What the proposal did with this rule")
+    section_title: str | None = Field(description="null until the policy has been uploaded")
+    text: str | None = Field(description="The rule's wording; null until the policy is uploaded")
+
+
 class ProposalSubjectOut(BaseModel):
     type: Literal["product", "customer", "order", "invoice"]
     code: str  # SKU, party code, or for an order the party code ("?" if the sender is unknown)
@@ -180,6 +212,7 @@ class ProposalOut(BaseModel):
     )
     explained_by: Literal["llm", "template"] | None
     draft_message: str | None = Field(description="A reminder's message for the customer")
+    policy: list[PolicyCitationOut] = Field(description="The policy rules this proposal follows")
 
 
 class ProposalsOut(BaseModel):
@@ -307,6 +340,9 @@ class InvoiceOut(BaseModel):
     proposal_id: int | None = Field(description="null: a duplicate, never proposed for payment")
     ready: bool | None = Field(description="Can be approved: supplier, products and figures OK")
     price_jumps: int | None
+    policy: list[PolicyCitationOut] = Field(
+        description="The policy rules the invoice's proposal follows; empty for a duplicate"
+    )
     created_at: datetime
 
 

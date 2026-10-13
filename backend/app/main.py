@@ -16,6 +16,7 @@ from app.api import (
     invoices,
     issues,
     orders,
+    policy,
     products,
     proposals,
     uploads,
@@ -59,6 +60,7 @@ app.include_router(customers.router)
 app.include_router(proposals.router)
 app.include_router(orders.router)
 app.include_router(invoices.router)
+app.include_router(policy.router)
 app.include_router(ws.router)
 
 
