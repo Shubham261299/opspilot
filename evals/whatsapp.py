@@ -9,21 +9,21 @@ from typing import Any
 from app.intake.customers import parse_customers
 from app.intake.whatsapp import parse_chat
 from app.intake.whatsapp_orders import OrdersReading, read_whatsapp_orders
-from evals.common import DATA, CountingAsk, Report, load_answer_key, load_catalog
+from evals.common import DATA, Models, Report, load_answer_key, load_catalog
 
 SUITE = "whatsapp"
 
 
-async def run(ask: CountingAsk) -> Report:
+async def run(models: Models) -> Report:
     key = load_answer_key()
     customers = parse_customers((DATA / "customers.xlsx").read_bytes()).customers
     chat = parse_chat(
         (DATA / "whatsapp_orders_export.txt").read_text(encoding="utf-8"), "Sharma Traders"
     )
     reading = await read_whatsapp_orders(
-        chat, load_catalog(), {c.code: c.shop_name for c in customers}, ask
+        chat, load_catalog(), {c.code: c.shop_name for c in customers}, models.ask
     )
-    return score(key, reading, ask.calls)
+    return score(key, reading, models.ask.calls)
 
 
 def score(key: dict[str, Any], reading: OrdersReading, model_calls: int) -> Report:

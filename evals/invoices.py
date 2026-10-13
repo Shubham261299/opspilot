@@ -13,24 +13,24 @@ from app.intake.errors import IntakeError
 from app.intake.invoice_pdf import pdf_text
 from app.intake.invoices import InvoiceReading, read_invoice
 from app.intake.issues import IssueType
-from evals.common import DATA, CountingAsk, Report, as_of, load_answer_key, load_catalog
+from evals.common import DATA, Models, Report, as_of, load_answer_key, load_catalog
 
 SUITE = "invoices"
 
 
-async def run(ask: CountingAsk) -> Report:
+async def run(models: Models) -> Report:
     key = load_answer_key()
     catalog, today = load_catalog(), as_of(key)
     rows: list[dict[str, Any]] = []
     for expected in key["expected_invoices"]:
         text = pdf_text((DATA / expected["file"]).read_bytes())
         try:
-            reading = await read_invoice(text, catalog, ask, today)
+            reading = await read_invoice(text, catalog, models.ask, today)
         except IntakeError as error:
             rows.append(not_read(expected, error.code))
             continue
         rows.append(score_invoice(expected, reading))
-    return Report(summarise(rows, ask.calls), rows)
+    return Report(summarise(rows, models.ask.calls), rows)
 
 
 def not_read(expected: dict[str, Any], code: str) -> dict[str, Any]:

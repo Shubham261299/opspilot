@@ -645,6 +645,31 @@ are facts. The cost: the mapping must be updated when a new kind of proposal or 
 which the test and review catch. Orders' own cards in the Orders list don't carry citations
 (their figures live on the proposal); the Inbox card of the order does.
 
+## 045 · Policy search is measured with a fixed question set, and the result decides its role (2026-10-13)
+
+**Context:** Search by meaning feels convincing on a few good examples (an informal probe of 8
+questions I wrote after reading the policy put the right rule first 7 times). Whether it can be
+trusted needs a measurement that doesn't depend on which examples are shown.
+**Options:** Judge by trying it · a fixed set of questions with expected rules, scored as hit@1
+(the right rule is the closest) and hit@3 · a larger set or an LLM judge.
+**Choice:** A `policy` eval suite (`evals/policy.py`): 18 questions in `answer_key.json` (15
+English, 3 Hinglish, one or more per rule), written before the first run and not changed to suit
+it. It runs the real code path (PDF to rules, embedding, import into Postgres with pgvector,
+`search_policy`) and is replayed in CI from recorded embeddings (the same tape idea as decision 042,
+vectors rounded to 5 decimals; the suite needs the CI Postgres, which has pgvector).
+**Result** (`nomic-embed-text`, 13 Oct 2026, one run): hit@1 10 of 18 (56%), hit@3 14 of
+18 (78%). English 9/15 and 11/15, Hinglish 1/3 and 3/3. Of the 8 misses at 1, five are a
+neighbouring rule (1.3 vs 1.4, 2.2 vs 2.3, 2.5 vs 2.3, 3.3 vs 3.2, 1.4 vs 1.5), two Hinglish
+questions went to 1.5 (the owner-approval rule; not investigated why) and one (1.2) to 3.1. With
+18 questions each is worth about 5 points.
+**Why it matters:** Search finds the right neighbourhood far more often than it picks the exact
+rule, which is the reason proposals cite rules by a fixed mapping (decision 044) and the Policy
+page shows the closest three with a note that the score is a ranking, not a probability. The
+honest README number is 56% / 78%, not the flattering probe.
+**Not done (would need this eval to prove it helps):** a hybrid of keyword and vector search, a
+larger embedding model, rewriting a question before searching, a bigger question set. Tuning
+against these same 18 questions would just fit them, so any attempt needs new questions first.
+
 ---
 
 ## Ideas
@@ -669,3 +694,7 @@ Out of scope for the current phase; pick up when the phase allows.
 - Check an invoice's GSTIN against the supplier's (add GSTINs to the supplier master): the sample
   copy of SC-118 prints a different GSTIN from the original.
 - A Prettier check in CI for the frontend (the code is mostly, not fully, formatted that way).
+- Better policy search, measured with the `policy` eval on new questions: hybrid keyword + vector
+  search, a larger embedding model (a hosted one by config; the column width is 768), query
+  rewriting, a bigger question set.
+- Show a rule's chips on the Orders list too (needs the order's proposal figures in its view).

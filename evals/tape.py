@@ -11,6 +11,9 @@ must be recorded again with the real model (`python evals/run.py <suite> --recor
 
 The tape wraps `litellm.acompletion`'s shape, one level below `complete_structured`, so the
 real code around the model call (fence stripping, validation, the repair retry) is exercised too.
+Embedding calls (`litellm.aembedding`'s shape) are recorded the same way; their vectors are
+rounded to 5 decimals so a tape stays small, and the rounded numbers are what the code sees in
+real runs too, so a recorded score and its replay are identical.
 """
 
 import hashlib
@@ -32,6 +35,12 @@ def request_key(messages: list[dict[str, str]], schema: Any) -> str:
     """A short, stable id for 'these messages, asking for this JSON shape'."""
     shape = schema.model_json_schema() if hasattr(schema, "model_json_schema") else None
     blob = json.dumps({"messages": messages, "schema": shape}, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
+
+
+def embedding_key(model: str, texts: list[str]) -> str:
+    """A short, stable id for 'this model, embedding these texts'."""
+    blob = json.dumps({"model": model, "input": texts}, ensure_ascii=False)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
 
@@ -112,3 +121,42 @@ class ReplayCompletion:
             self.misses.append(f"{_purpose(kwargs) or 'unknown'} ({key})")
             raise ReplayMiss(f"No recorded answer for request {key}; record the tape again.")
         return _answer(entry["answer"])
+
+
+def _embedding_response(vectors: list[list[float]]) -> Any:
+    """The part of a LiteLLM embedding response that embed_texts reads."""
+    return SimpleNamespace(data=[{"embedding": vector} for vector in vectors])
+
+
+class RecordingEmbedding:
+    """Calls the real embedding model and writes the (rounded) vectors on the tape."""
+
+    def __init__(self, real: Completion, tape: Tape) -> None:
+        self.real, self.tape = real, tape
+
+    async def __call__(self, **kwargs: Any) -> Any:
+        response = await self.real(**kwargs)
+        vectors = [[round(float(x), 5) for x in item["embedding"]] for item in response.data]
+        key = embedding_key(kwargs["model"], kwargs["input"])
+        self.tape.entries[key] = {
+            "purpose": "embeddings",
+            "answer": json.dumps(vectors, separators=(",", ":")),
+        }
+        return _embedding_response(vectors)
+
+
+class ReplayEmbedding:
+    """Plays recorded vectors back. `misses` lists texts the tape didn't have (a changed
+    policy, question or embedding prefix), like ReplayCompletion's."""
+
+    def __init__(self, tape: Tape) -> None:
+        self.tape = tape
+        self.misses: list[str] = []
+
+    async def __call__(self, **kwargs: Any) -> Any:
+        key = embedding_key(kwargs["model"], kwargs["input"])
+        entry = self.tape.entries.get(key)
+        if entry is None:
+            self.misses.append(f"embeddings ({key})")
+            raise ReplayMiss(f"No recorded embedding for request {key}; record the tape again.")
+        return _embedding_response(json.loads(entry["answer"]))

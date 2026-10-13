@@ -663,6 +663,98 @@
       "marked_duplicate": true
     }
   ],
+  "policy_questions": [
+    {
+      "question": "How big should our cushion stock be?",
+      "expected": "1.1",
+      "language": "en"
+    },
+    {
+      "question": "How is the level that triggers a new order worked out?",
+      "expected": "1.2",
+      "language": "en"
+    },
+    {
+      "question": "At what stock level should I place a new supplier order?",
+      "expected": "1.3",
+      "language": "en"
+    },
+    {
+      "question": "How many units should a purchase order ask for?",
+      "expected": "1.4",
+      "language": "en"
+    },
+    {
+      "question": "Who has to sign off on a very big purchase order?",
+      "expected": "1.5",
+      "language": "en"
+    },
+    {
+      "question": "Where do I find a customer's credit limit and how long they get to pay?",
+      "expected": "2.1",
+      "language": "en"
+    },
+    {
+      "question": "When does a customer's bill count as late?",
+      "expected": "2.2",
+      "language": "en"
+    },
+    {
+      "question": "When should I send a payment reminder?",
+      "expected": "2.3",
+      "language": "en"
+    },
+    {
+      "question": "When do we stop dispatching to a customer who owes us a lot?",
+      "expected": "2.4",
+      "language": "en"
+    },
+    {
+      "question": "What tone should messages about unpaid bills have?",
+      "expected": "2.5",
+      "language": "en"
+    },
+    {
+      "question": "What if a customer suddenly orders far more than they normally do?",
+      "expected": "3.1",
+      "language": "en"
+    },
+    {
+      "question": "What do I do when a customer's message doesn't make sense?",
+      "expected": "3.2",
+      "language": "en"
+    },
+    {
+      "question": "A customer asked for an item we don't carry. What now?",
+      "expected": "3.3",
+      "language": "en"
+    },
+    {
+      "question": "The supplier's invoice shows a much higher price than last time. What do I check?",
+      "expected": "4.1",
+      "language": "en"
+    },
+    {
+      "question": "Can we pay a supplier bill again if it shows up twice?",
+      "expected": "4.2",
+      "language": "en"
+    },
+    {
+      "question": "Customer ka paisa bahut din se pending hai, naya order roke kya?",
+      "expected": "2.4",
+      "language": "hinglish"
+    },
+    {
+      "question": "Safety ke liye kitna stock rakhna hai?",
+      "expected": "1.1",
+      "language": "hinglish"
+    },
+    {
+      "question": "Supplier ne rate badha diya, owner ko batana padega kya?",
+      "expected": "4.1",
+      "language": "hinglish"
+    }
+  ],
   "data_issues": [
     {
       "file": "stock_register.xlsx",

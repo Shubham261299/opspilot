@@ -435,10 +435,33 @@ anomalies=[
  dict(type="invoice_price_jump",detail=f"Brightline invoice BL-0874 bills LED Bulb 9W at Rs {jump} vs last purchase rate Rs {PM['ST-0017']['cost_price']} (+32%, rule 4.1)."),
  dict(type="duplicate_invoice",detail="Sai Conduits invoice SC-118 received twice (second PDF marked DUPLICATE COPY) - rule 4.2."),
 ]
+# Questions an owner might ask, with the rule that answers each (for the policy search eval).
+# Written before the first eval run and not changed to suit its results. One per rule, in plain
+# words that mostly avoid the rule's own wording, plus three in Hinglish like the shop's chats.
+policy_questions=[
+ dict(question="How big should our cushion stock be?",expected="1.1",language="en"),
+ dict(question="How is the level that triggers a new order worked out?",expected="1.2",language="en"),
+ dict(question="At what stock level should I place a new supplier order?",expected="1.3",language="en"),
+ dict(question="How many units should a purchase order ask for?",expected="1.4",language="en"),
+ dict(question="Who has to sign off on a very big purchase order?",expected="1.5",language="en"),
+ dict(question="Where do I find a customer's credit limit and how long they get to pay?",expected="2.1",language="en"),
+ dict(question="When does a customer's bill count as late?",expected="2.2",language="en"),
+ dict(question="When should I send a payment reminder?",expected="2.3",language="en"),
+ dict(question="When do we stop dispatching to a customer who owes us a lot?",expected="2.4",language="en"),
+ dict(question="What tone should messages about unpaid bills have?",expected="2.5",language="en"),
+ dict(question="What if a customer suddenly orders far more than they normally do?",expected="3.1",language="en"),
+ dict(question="What do I do when a customer's message doesn't make sense?",expected="3.2",language="en"),
+ dict(question="A customer asked for an item we don't carry. What now?",expected="3.3",language="en"),
+ dict(question="The supplier's invoice shows a much higher price than last time. What do I check?",expected="4.1",language="en"),
+ dict(question="Can we pay a supplier bill again if it shows up twice?",expected="4.2",language="en"),
+ dict(question="Customer ka paisa bahut din se pending hai, naya order roke kya?",expected="2.4",language="hinglish"),
+ dict(question="Safety ke liye kitna stock rakhna hai?",expected="1.1",language="hinglish"),
+ dict(question="Supplier ne rate badha diya, owner ko batana padega kya?",expected="4.1",language="hinglish"),
+]
 key=dict(as_of=TODAY.isoformat(),policy=dict(safety_days=SAFETY_DAYS,cover_days=COVER_DAYS),
   expected_reorders=expected_reorders,open_purchase_orders=[dict(sku=k,qty=v,note="Mentioned in stock register remarks") for k,v in open_po.items()],
   expected_payment_actions=pay_actions,expected_orders=[dict(customer=o["customer"],items=[dict(sku=a,qty=b) for a,b in o["items"]],note=o["note"]) for o in expected_orders],
-  non_orders=[dict(from_=a,why=b) for a,b in non_orders],anomalies=anomalies,expected_invoices=expected_invoices,data_issues=issues)
+  non_orders=[dict(from_=a,why=b) for a,b in non_orders],anomalies=anomalies,expected_invoices=expected_invoices,policy_questions=policy_questions,data_issues=issues)
 (OUT/"answer_key.json").write_text(json.dumps(key,indent=2,default=str),encoding="utf-8")
 print("reorders",len(expected_reorders),"pay actions",len(pay_actions),"orders",len(expected_orders),"issues",len(issues),"sales rows",len(sales))
 for r in expected_reorders: print(r["sku"],r["name"][:28],r["on_hand"],r["reorder_point"],r["reorder_qty"])

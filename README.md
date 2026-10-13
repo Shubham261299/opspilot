@@ -18,7 +18,7 @@ The customer is fictional: **Sharma Traders**, an electrical and hardware parts 
 Pune with 60 products, 25 shop-owner customers and 6 suppliers. Every name, number and record in
 this repo is invented.
 
-> **Status:** building in public, week 5 of 7 done (v0.3); next is policy search. Only
+> **Status:** building in public, week 6 of 7 done (v0.4); next is the public demo. Only
 > features marked ✅ work today; the rest is on the [roadmap](#roadmap).
 
 ## What works so far
@@ -38,9 +38,11 @@ this repo is invented.
 | WhatsApp orders: a chat export is read by a local language model in the background; products are matched by code first and the model second, and anything doubtful goes to review, never guessed. Each order waits in the Approval Inbox to be confirmed; the owner can fix any line. Measured against the answer key with the eval suite (`python evals/run.py whatsapp`, 13 Oct 2026): qwen2.5:14b gets 15 of 16 orders fully right and 44 of 45 lines exact, with 0 wrong products or quantities (the last line goes to review); qwen2.5:7b gets 13 of 16 and 43 of 45, 2× faster, and picked one wrong product (marked "matched by the model" for the owner to check). One run each; the same model can read an ambiguous line differently between runs | ✅ |
 | Approval agents (LangGraph): each proposal pauses at `interrupt()` until the owner decides, saved in Postgres so it survives a restart (an agent cut off while explaining carries on from its checkpoint when the API starts), then the decision is applied and audited | ✅ |
 | Explanations written by the language model, with every number checked by code: on the first real run 33 of 34 passed, and the one rejected had invented an amount, so the code's own wording was shown instead | ✅ |
+| Policy search: `company_policy.pdf` is split by code into its 15 numbered rules, each embedded with `nomic-embed-text` (Ollama) and stored in Postgres with pgvector. The Policy page and `GET /policy/search` find the rules closest in meaning to a question. On 18 fixed questions (15 English, 3 Hinglish; written before the first run, one run) the right rule is the closest in 10 (56%) and among the closest three in 14 (78%): English 9 and 11 of 15, Hinglish 1 and 3 of 3. Misses are mostly a neighbouring rule (1.3 vs 1.4, 2.2 vs 2.3, 3.3 vs 3.2). So search helps you find a rule but is not trusted to decide one | ✅ |
+| Proposals show the policy rules they follow (reorder 1.2 to 1.4, reminder 2.3 and 2.5, hold 2.4, order 2.4/3.1/3.2, invoice 4.1 and 4.2), each with what it did with the rule and the rule's wording. They come from a fixed mapping in code, never from search, and a test fails if a cited rule number is missing from the policy | ✅ |
 | CI on every pull request and push to `main`: lint, tests against a real Postgres, the evals replayed from recordings, frontend type-check, lint and build | ✅ |
 | Tracing of every model call in Langfuse (optional: set the three `LANGFUSE_*` keys in `.env`; without them nothing is sent and the app behaves the same): prompt, answer, model, tokens, latency, and whether the repair retry was needed. Tracing can't break a call, as a test shows | ✅ |
-| Eval suite (`evals/`): the WhatsApp order reading and the invoice reading are scored against the answer key. With the real model, qwen2.5:14b reads all 4 sample invoices right (12 of 12 lines, every total to the paisa), and so does 7b. CI replays recorded model answers, so it catches broken reading code or scoring without needing a model (it can't tell if the model got worse: only a real run can) | ✅ |
+| Eval suite (`evals/`): the WhatsApp order reading, the invoice reading and the policy search are scored against the answer key. With the real model, qwen2.5:14b reads all 4 sample invoices right (12 of 12 lines, every total to the paisa), and so does 7b. CI replays recorded model answers and embeddings, so it catches broken reading, search or scoring code without needing a model (it can't tell if the model got worse: only a real run can) | ✅ |
 | Live updates over a WebSocket: new proposals, AI explanations, decisions and finished uploads appear in the Approval Inbox, Orders and Upload pages without a refresh, and the connection comes back by itself after a restart | ✅ |
 | Supplier invoice PDFs: drop several at once on the Upload page; the text is read with pypdf, the item table by code, the header and totals by the language model, and code checks every line, the subtotal, GST and the grand total to the paisa. An Invoices page shows each line next to the last purchase rate. On a real run (qwen2.5:14b) all 4 sample invoices were read and every line matched | ✅ |
 | Anomaly checks from the company policy, as pure functions: a duplicate invoice is saved as `duplicate` and can never be approved (1 of 1, also when both copies arrive at once); an invoice rate more than 10% above the last purchase rate is flagged (1 of 1: ₹63.36 against ₹48, +32.0%); an order more than 5× the customer's usual quantity is flagged (Royal Hardware's 200 coils, 120×), shown on the order's Inbox card. Honest note: against the counter-sized sample sales history the order rule also flags 27 bulk lines the answer key doesn't list, so confirmed orders become the baseline as they build up ([decision 036](docs/decisions.md)) | ✅ |
@@ -66,12 +68,16 @@ Then open **<http://localhost:3000>**:
    (normally the copy) is marked duplicate and never offered for payment, and Brightline's 9W
    bulb is flagged as 32% above its last purchase rate.
 
+5. Optional, needs an embedding model: drop `company_policy.pdf` on the policy card, then open
+   the **Policy** page and ask a question in your own words. The Inbox cards then show the
+   policy rule each proposal follows, with the rule's wording.
+
 The pages update by themselves as background work finishes (the dot at the top right shows
 "Live").
 
 The language model runs on your computer with [Ollama](https://ollama.com): `ollama pull
-qwen2.5:14b` (or `qwen2.5:7b`, 2.6× faster, set `LLM_MODEL=ollama_chat/qwen2.5:7b`). Without it
-everything else works; proposals keep the code's own explanation, and a WhatsApp chat or an
+qwen2.5:14b` (or `qwen2.5:7b`, 2.6× faster, set `LLM_MODEL=ollama_chat/qwen2.5:7b`), and `ollama
+pull nomic-embed-text` for policy search. Without them everything else works; proposals keep the code's own explanation, and a WhatsApp chat or an
 invoice is reported as unread instead of guessed.
 
 The sample data describes 24 Sep 2026, so the API treats that day as "today" (set `APP_TODAY` to
@@ -112,6 +118,11 @@ The Upload page: one card per file; invoices can be dropped several at once.
 
 ![Upload](docs/upload.png)
 
+The Policy page: a question in plain words, the closest rules with their similarity (a ranking, not
+a probability), and every rule below with the matches highlighted.
+
+![Policy search](docs/policy.png)
+
 ## How it works
 
 ```mermaid
@@ -123,6 +134,7 @@ flowchart LR
     rules --> proposals["Proposals"]
     proposals --> agent["LangGraph agent: explain, then wait at interrupt()"]
     llm -. "words only; every number checked by code" .-> agent
+    policy["Company policy: numbered rules + embeddings (pgvector)"] -. "searched on the Policy page; proposals cite rules by a fixed mapping" .-> inbox
     agent --> inbox["Approval Inbox"]
     inbox -- "owner approves or rejects" --> agent
     agent --> effect["Purchase order, hold, reminder, confirmed order or invoice approved for payment, plus an audit row"]
@@ -142,7 +154,7 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 pytest                           # unit tests + database tests (a fake model; no LLM needed)
 ruff check . && ruff format --check .
-python -m pytest ../evals        # the evals, replayed from recorded model answers (no LLM)
+python -m pytest ../evals        # the evals, replayed from recorded model answers (no LLM; needs the db above)
 cd .. && python evals/run.py all # the evals with the real model (Ollama); see evals/README.md
 ```
 
@@ -158,10 +170,10 @@ npm run typecheck && npm run lint && npm run build
 ## Stack
 
 - **Backend:** Python 3.12 · FastAPI · Pydantic v2 · SQLAlchemy 2 (async) · Alembic · pandas ·
-  pypdf · PostgreSQL 16
+  pypdf · PostgreSQL 16 with pgvector
 - **Frontend:** React 19 · TypeScript · Vite · Tailwind CSS · shadcn/ui · React Router
-- **AI:** LiteLLM (one way to any model) · Ollama with qwen2.5 locally · LangGraph agents with
-  a Postgres checkpointer
+- **AI:** LiteLLM (one way to any model) · Ollama with qwen2.5 and nomic-embed-text locally ·
+  LangGraph agents with a Postgres checkpointer · Langfuse tracing (optional)
 - **Realtime:** FastAPI WebSockets
 - **Running it:** Docker Compose (Postgres, API, nginx serving the web app)
 - **CI:** GitHub Actions (backend and frontend jobs in parallel, Postgres as a service container)
@@ -177,7 +189,7 @@ More pieces arrive as the features that need them ship.
 | 3 ✅ | v0.2 | LLM agents (LiteLLM, LangGraph) that pause for approval; WhatsApp orders |
 | 4 ✅ | v0.3a | PDF supplier invoices, anomaly checks, live inbox (WebSockets) |
 | 5 ✅ | v0.3 | Tracing (Langfuse) and an eval suite in CI |
-| 6 | v0.4 | Policy search (pgvector); proposals cite the rule they follow |
+| 6 ✅ | v0.4 | Policy search (pgvector); proposals cite the rule they follow |
 | 7 | v1.0 | Public demo |
 
 ## Design decisions

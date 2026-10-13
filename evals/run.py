@@ -23,11 +23,21 @@ from types import ModuleType
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT), str(ROOT / "backend")]
 
-from evals import invoices, whatsapp  # noqa: E402
-from evals.common import RECORDINGS, RESULTS, CountingAsk, Report  # noqa: E402
-from evals.tape import RecordingCompletion, ReplayCompletion, Tape  # noqa: E402
+from evals import invoices, policy, whatsapp  # noqa: E402
+from evals.common import RECORDINGS, RESULTS, Models, Report  # noqa: E402
+from evals.tape import (  # noqa: E402
+    RecordingCompletion,
+    RecordingEmbedding,
+    ReplayCompletion,
+    ReplayEmbedding,
+    Tape,
+)
 
-SUITES: dict[str, ModuleType] = {whatsapp.SUITE: whatsapp, invoices.SUITE: invoices}
+SUITES: dict[str, ModuleType] = {
+    whatsapp.SUITE: whatsapp,
+    invoices.SUITE: invoices,
+    policy.SUITE: policy,
+}
 
 
 async def run_suite(name: str, mode: str) -> Report:
@@ -39,12 +49,13 @@ async def run_suite(name: str, mode: str) -> Report:
     suite, model = SUITES[name], get_settings().llm_model
     tape_path = RECORDINGS / f"{name}.json"
     if mode == "replay":
-        replay = ReplayCompletion(Tape.load(tape_path))
-        report = await suite.run(CountingAsk(replay))
-        if replay.misses:
+        tape = Tape.load(tape_path)
+        chat, embedding = ReplayCompletion(tape), ReplayEmbedding(tape)
+        report = await suite.run(Models(chat, embedding))
+        if chat.misses or embedding.misses:
             sys.exit(
                 f"{name}: the tape is out of date, record it again:\n  "
-                + "\n  ".join(replay.misses)
+                + "\n  ".join(chat.misses + embedding.misses)
             )
         return report
 
@@ -52,10 +63,13 @@ async def run_suite(name: str, mode: str) -> Report:
     tape = Tape(
         path=tape_path, model=model, recorded_at=datetime.now().isoformat(timespec="seconds")
     )
-    completion = RecordingCompletion(litellm.acompletion, tape)
+    models = Models(
+        RecordingCompletion(litellm.acompletion, tape),
+        RecordingEmbedding(litellm.aembedding, tape),
+    )
     print(f"{name}: running with {model} ...", flush=True)
     started = time.perf_counter()
-    report = await suite.run(CountingAsk(completion))
+    report = await suite.run(models)
     seconds = round(time.perf_counter() - started)
     save_result(name, model, seconds, report)
     if mode == "record":

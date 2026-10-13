@@ -11,17 +11,19 @@ run `python evals/run.py all --record` with the real model and commit the new ta
 
 import pytest
 
-from evals import invoices, whatsapp
-from evals.common import RECORDINGS, CountingAsk
-from evals.tape import ReplayCompletion, Tape
+from evals import invoices, policy, whatsapp
+from evals.common import RECORDINGS, Models
+from evals.tape import ReplayCompletion, ReplayEmbedding, Tape
 
-SUITES = {whatsapp.SUITE: whatsapp, invoices.SUITE: invoices}
+SUITES = {whatsapp.SUITE: whatsapp, invoices.SUITE: invoices, policy.SUITE: policy}
 
 
 @pytest.mark.parametrize("name", SUITES)
 async def test_the_replayed_score_matches_the_recorded_one(name: str) -> None:
     tape = Tape.load(RECORDINGS / f"{name}.json")
-    replay = ReplayCompletion(tape)
-    report = await SUITES[name].run(CountingAsk(replay))
-    assert replay.misses == [], "the tape is out of date: record it again with the real model"
+    chat, embedding = ReplayCompletion(tape), ReplayEmbedding(tape)
+    report = await SUITES[name].run(Models(chat, embedding))
+    assert chat.misses + embedding.misses == [], (
+        "the tape is out of date: record it again with the real model"
+    )
     assert report.summary == tape.expected_summary

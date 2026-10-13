@@ -1,0 +1,300 @@
+{
+  "summary": {
+    "model": "ollama_chat/qwen2.5:14b",
+    "run_at": "2026-10-13T14:11:26",
+    "seconds": 2,
+    "embedding_calls": 19,
+    "rules_loaded": 15,
+    "questions": 18,
+    "hit_at_1": 10,
+    "hit_at_3": 14,
+    "english_questions": 15,
+    "english_hit_at_1": 9,
+    "english_hit_at_3": 11,
+    "hinglish_questions": 3,
+    "hinglish_hit_at_1": 1,
+    "hinglish_hit_at_3": 3,
+    "missed_at_1": [
+      "1.2 expected, closest 3.1: How is the level that triggers a new order worked out?",
+      "1.3 expected, closest 1.4: At what stock level should I place a new supplier order?",
+      "1.4 expected, closest 1.5: How many units should a purchase order ask for?",
+      "2.2 expected, closest 2.3: When does a customer's bill count as late?",
+      "2.5 expected, closest 2.3: What tone should messages about unpaid bills have?",
+      "3.3 expected, closest 3.2: A customer asked for an item we don't carry. What now?",
+      "2.4 expected, closest 1.5: Customer ka paisa bahut din se pending hai, naya order roke kya?",
+      "4.1 expected, closest 1.5: Supplier ne rate badha diya, owner ko batana padega kya?"
+    ]
+  },
+  "details": [
+    {
+      "question": "How big should our cushion stock be?",
+      "language": "en",
+      "expected": "1.1",
+      "got": [
+        "1.1",
+        "1.4",
+        "1.5"
+      ],
+      "scores": [
+        0.6234,
+        0.6064,
+        0.5945
+      ]
+    },
+    {
+      "question": "How is the level that triggers a new order worked out?",
+      "language": "en",
+      "expected": "1.2",
+      "got": [
+        "3.1",
+        "1.5",
+        "4.1"
+      ],
+      "scores": [
+        0.6675,
+        0.6648,
+        0.6632
+      ]
+    },
+    {
+      "question": "At what stock level should I place a new supplier order?",
+      "language": "en",
+      "expected": "1.3",
+      "got": [
+        "1.4",
+        "1.5",
+        "1.2"
+      ],
+      "scores": [
+        0.7452,
+        0.7107,
+        0.7089
+      ]
+    },
+    {
+      "question": "How many units should a purchase order ask for?",
+      "language": "en",
+      "expected": "1.4",
+      "got": [
+        "1.5",
+        "3.1",
+        "4.1"
+      ],
+      "scores": [
+        0.6992,
+        0.6818,
+        0.6323
+      ]
+    },
+    {
+      "question": "Who has to sign off on a very big purchase order?",
+      "language": "en",
+      "expected": "1.5",
+      "got": [
+        "1.5",
+        "3.1",
+        "4.1"
+      ],
+      "scores": [
+        0.7189,
+        0.651,
+        0.6452
+      ]
+    },
+    {
+      "question": "Where do I find a customer's credit limit and how long they get to pay?",
+      "language": "en",
+      "expected": "2.1",
+      "got": [
+        "2.1",
+        "2.4",
+        "2.3"
+      ],
+      "scores": [
+        0.8128,
+        0.763,
+        0.7533
+      ]
+    },
+    {
+      "question": "When does a customer's bill count as late?",
+      "language": "en",
+      "expected": "2.2",
+      "got": [
+        "2.3",
+        "2.2",
+        "2.4"
+      ],
+      "scores": [
+        0.7624,
+        0.7436,
+        0.7086
+      ]
+    },
+    {
+      "question": "When should I send a payment reminder?",
+      "language": "en",
+      "expected": "2.3",
+      "got": [
+        "2.3",
+        "2.5",
+        "2.4"
+      ],
+      "scores": [
+        0.7932,
+        0.7272,
+        0.6339
+      ]
+    },
+    {
+      "question": "When do we stop dispatching to a customer who owes us a lot?",
+      "language": "en",
+      "expected": "2.4",
+      "got": [
+        "2.4",
+        "2.3",
+        "2.2"
+      ],
+      "scores": [
+        0.7203,
+        0.6984,
+        0.6622
+      ]
+    },
+    {
+      "question": "What tone should messages about unpaid bills have?",
+      "language": "en",
+      "expected": "2.5",
+      "got": [
+        "2.3",
+        "2.2",
+        "2.5"
+      ],
+      "scores": [
+        0.6822,
+        0.6813,
+        0.6504
+      ]
+    },
+    {
+      "question": "What if a customer suddenly orders far more than they normally do?",
+      "language": "en",
+      "expected": "3.1",
+      "got": [
+        "3.1",
+        "2.4",
+        "3.2"
+      ],
+      "scores": [
+        0.7233,
+        0.7226,
+        0.6722
+      ]
+    },
+    {
+      "question": "What do I do when a customer's message doesn't make sense?",
+      "language": "en",
+      "expected": "3.2",
+      "got": [
+        "3.2",
+        "2.5",
+        "2.4"
+      ],
+      "scores": [
+        0.7537,
+        0.6525,
+        0.6418
+      ]
+    },
+    {
+      "question": "A customer asked for an item we don't carry. What now?",
+      "language": "en",
+      "expected": "3.3",
+      "got": [
+        "3.2",
+        "2.4",
+        "2.5"
+      ],
+      "scores": [
+        0.6968,
+        0.6467,
+        0.6285
+      ]
+    },
+    {
+      "question": "The supplier's invoice shows a much higher price than last time. What do I check?",
+      "language": "en",
+      "expected": "4.1",
+      "got": [
+        "4.1",
+        "4.2",
+        "1.5"
+      ],
+      "scores": [
+        0.7906,
+        0.749,
+        0.6561
+      ]
+    },
+    {
+      "question": "Can we pay a supplier bill again if it shows up twice?",
+      "language": "en",
+      "expected": "4.2",
+      "got": [
+        "4.2",
+        "4.1",
+        "1.4"
+      ],
+      "scores": [
+        0.7479,
+        0.637,
+        0.6273
+      ]
+    },
+    {
+      "question": "Customer ka paisa bahut din se pending hai, naya order roke kya?",
+      "language": "hinglish",
+      "expected": "2.4",
+      "got": [
+        "1.5",
+        "2.4",
+        "2.5"
+      ],
+      "scores": [
+        0.6283,
+        0.591,
+        0.5728
+      ]
+    },
+    {
+      "question": "Safety ke liye kitna stock rakhna hai?",
+      "language": "hinglish",
+      "expected": "1.1",
+      "got": [
+        "1.1",
+        "1.5",
+        "1.2"
+      ],
+      "scores": [
+        0.6212,
+        0.5851,
+        0.5473
+      ]
+    },
+    {
+      "question": "Supplier ne rate badha diya, owner ko batana padega kya?",
+      "language": "hinglish",
+      "expected": "4.1",
+      "got": [
+        "1.5",
+        "4.1",
+        "1.4"
+      ],
+      "scores": [
+        0.642,
+        0.5765,
+        0.5382
+      ]
+    }
+  ]
+}
