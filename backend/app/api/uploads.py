@@ -10,6 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, File, UploadFile, status
 from app.api.deps import (
     AgentsDep,
     AskDep,
+    EmbedderDep,
     SessionDep,
     SessionFactoryDep,
     SettingsDep,
@@ -19,6 +20,7 @@ from app.api.errors import ApiError
 from app.api.schemas import (
     CustomersUploadOut,
     DuesUploadOut,
+    PolicyUploadOut,
     PoNoteOut,
     SalesUploadOut,
     StockUploadOut,
@@ -34,6 +36,7 @@ from app.intake.dues_import import import_outstanding_dues
 from app.intake.errors import AlreadyUploaded
 from app.intake.invoice_import import process_invoice_upload, start_invoice_upload
 from app.intake.issues import IssueRecord
+from app.intake.policy_import import import_policy
 from app.intake.sales_import import import_sales_history
 from app.intake.stock_import import import_stock_register
 from app.intake.whatsapp_import import (
@@ -152,6 +155,35 @@ async def upload_supplier_invoice(
     return UploadAcceptedOut(
         upload=UploadOut.model_validate(upload),
         message="Reading the invoice with the language model; this takes about a minute.",
+    )
+
+
+@router.post(
+    "/policy",
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        413: {"description": "The file is over the size limit"},
+        415: {"description": "Not a .pdf file"},
+        422: {"description": "Not a readable policy PDF, or it couldn't be embedded"},
+    },
+)
+async def upload_company_policy(
+    file: Annotated[UploadFile, File(description="The company policy, as a .pdf file")],
+    session: SessionDep,
+    settings: SettingsDep,
+    embed: EmbedderDep,
+) -> PolicyUploadOut:
+    """Upload the company policy. Its numbered rules are embedded and replace the stored ones;
+    uploading the same file again re-embeds them (after changing the embedding model)."""
+    filename, content = await _read_file(file, settings, "the policy", ".pdf", "a .pdf file")
+    imported = await import_policy(
+        session, filename=filename, content=content, embed=embed, actor=OWNER
+    )
+    return PolicyUploadOut(
+        upload=UploadOut.model_validate(imported.upload),
+        **_issue_counts(imported.issues),
+        rules_loaded=imported.rules_loaded,
+        embedding_model=imported.embedding_model,
     )
 
 

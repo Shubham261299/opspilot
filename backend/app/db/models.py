@@ -10,6 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     ARRAY,
     CheckConstraint,
@@ -94,7 +95,7 @@ class Upload(Base):
         CheckConstraint("status IN ('processing', 'processed', 'failed')", name="status_valid"),
         CheckConstraint(
             "kind IN ('stock_register', 'customers', 'outstanding_dues', 'sales_history', "
-            "'whatsapp_chat', 'supplier_invoice')",
+            "'whatsapp_chat', 'supplier_invoice', 'company_policy')",
             name="kind_valid",
         ),
     )
@@ -466,4 +467,27 @@ class AuditLog(Base):
     before: Mapped[dict[str, Any] | None]
     after: Mapped[dict[str, Any] | None]
     request_id: Mapped[str | None]  # links the audit row to the request's log lines
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+EMBEDDING_DIM = 768  # width of policy_rules.embedding; the embedding model must produce this many
+
+
+class PolicyRule(Base):
+    """One numbered rule of the company policy, with its embedding for search by meaning.
+
+    Uploading the policy again replaces every row (a snapshot, like the dues sheet); proposals
+    refer to a rule by `code` ("2.4"), never by id, so they keep working across uploads.
+    """
+
+    __tablename__ = "policy_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(String(10), unique=True)  # as printed, e.g. "2.4"
+    section_no: Mapped[int]
+    section_title: Mapped[str]  # e.g. "Customer credit"
+    text: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM))
+    embedding_model: Mapped[str]  # which model made the embedding (search must use the same)
+    upload_id: Mapped[int | None] = mapped_column(ForeignKey("uploads.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

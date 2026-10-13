@@ -3,7 +3,8 @@ name: opspilot
 
 services:
   db:
-    image: postgres:16-alpine
+    # Postgres 16 with the pgvector extension (policy search, v0.4); same major version as before
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-opspilot}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opspilot}
@@ -35,6 +36,8 @@ services:
       # 14b for the demo: more accurate than 7b, 2.6x slower (decision 029); 7b for quick dev runs
       LLM_MODEL: ${LLM_MODEL:-ollama_chat/qwen2.5:14b}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      # The model that turns policy rules and questions into vectors for search (decision 043).
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-ollama/nomic-embed-text}
       # Optional tracing in Langfuse (decision 041); empty = off.
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}

@@ -16,6 +16,7 @@ from app.agents.approval import AgentRunner
 from app.config import Settings, get_settings
 from app.db.session import get_session, get_sessionmaker
 from app.intake.product_picks import Ask, ask_llm
+from app.llm.embeddings import Embedder, embed_texts
 
 
 def get_today() -> date:
@@ -34,6 +35,14 @@ def get_ask() -> Ask:
 
 
 AskDep = Annotated[Ask, Depends(get_ask)]
+
+
+def get_embedder() -> Embedder:
+    """The embedding model, as a function; tests replace it with a fake one."""
+    return embed_texts
+
+
+EmbedderDep = Annotated[Embedder, Depends(get_embedder)]
 
 
 def get_agents(request: Request) -> AgentRunner:

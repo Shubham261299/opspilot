@@ -36,6 +36,7 @@ OUTSTANDING_DUES = "outstanding_dues"
 SALES_HISTORY = "sales_history"
 WHATSAPP_CHAT = "whatsapp_chat"
 SUPPLIER_INVOICE = "supplier_invoice"
+COMPANY_POLICY = "company_policy"
 
 
 @dataclass(frozen=True)

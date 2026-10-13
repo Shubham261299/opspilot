@@ -6,7 +6,10 @@ In CI: TEST_DATABASE_URL points at the Postgres service container.
 """
 
 import asyncio
+import hashlib
+import math
 import os
+import re
 from collections.abc import AsyncIterator
 from datetime import date
 from pathlib import Path
@@ -27,9 +30,10 @@ from sqlalchemy.pool import NullPool
 
 from app.agents.approval import AgentRunner
 from app.agents.checkpoint import open_checkpointer
-from app.db.models import Base
+from app.db.models import EMBEDDING_DIM, Base
 from app.db.seed import ProductRow, SupplierRow, read_csv_rows, seed_reference_data
 from app.llm.client import LlmError
+from app.llm.embeddings import Embedded, TextKind
 
 DEFAULT_TEST_DATABASE_URL = "postgresql+asyncpg://opspilot:opspilot@localhost:5433/opspilot_test"
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
@@ -130,6 +134,31 @@ class ModelUnavailable:
         raise LlmError("unavailable", "no language model in tests")
 
 
+class HashingEmbedder:
+    """A stand-in embedding model: each word adds to one of 768 slots (chosen by hashing it), so
+    texts that share words are close and others are not. Deterministic, no model needed."""
+
+    def __init__(self, model: str = "fake-hashing-embedder") -> None:
+        self.model, self.calls = model, []
+
+    async def __call__(self, texts: list[str], kind: TextKind = "document") -> Embedded:
+        self.calls.append((list(texts), kind))
+        return Embedded([self.vector(text) for text in texts], self.model)
+
+    @staticmethod
+    def vector(text: str) -> list[float]:
+        slots = [0.0] * EMBEDDING_DIM
+        for word in re.findall(r"[a-z0-9]+", text.lower()):
+            slots[int(hashlib.md5(word.encode()).hexdigest(), 16) % EMBEDDING_DIM] += 1.0
+        norm = math.sqrt(sum(x * x for x in slots)) or 1.0
+        return [x / norm for x in slots]
+
+
+@pytest.fixture
+def embedder() -> HashingEmbedder:
+    return HashingEmbedder()
+
+
 @pytest.fixture
 async def agents(db_engine: AsyncEngine) -> AsyncIterator[AgentRunner]:
     """Approval agents with a real Postgres checkpointer on the test database."""
@@ -139,12 +168,14 @@ async def agents(db_engine: AsyncEngine) -> AsyncIterator[AgentRunner]:
 
 
 @pytest.fixture
-async def client(db_engine: AsyncEngine, agents: AgentRunner) -> AsyncIterator[AsyncClient]:
+async def client(
+    db_engine: AsyncEngine, agents: AgentRunner, embedder: HashingEmbedder
+) -> AsyncIterator[AsyncClient]:
     """An HTTP client that calls the app directly (no server), using the test database.
 
     httpx's ASGITransport hands each request straight to the FastAPI app in this process.
     """
-    from app.api.deps import get_agents, get_today
+    from app.api.deps import get_agents, get_embedder, get_today
     from app.db.session import get_session, get_sessionmaker
     from app.main import app  # imported here, after DATABASE_URL points at the test database
 
@@ -158,6 +189,7 @@ async def client(db_engine: AsyncEngine, agents: AgentRunner) -> AsyncIterator[A
     app.dependency_overrides[get_sessionmaker] = lambda: sessions  # for background tasks
     app.dependency_overrides[get_agents] = lambda: agents
     app.dependency_overrides[get_today] = lambda: TEST_TODAY
+    app.dependency_overrides[get_embedder] = lambda: embedder
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as http:
         yield http
     app.dependency_overrides.clear()

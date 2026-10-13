@@ -598,6 +598,33 @@ can, and tapes must be re-recorded (about 10 minutes with qwen2.5:14b) after a p
 First recorded runs (13 Oct 2026): 14b WhatsApp 15/16 orders, 44/45 lines, 4/4 non-orders;
 invoices 4/4, 12/12 lines. 7b: WhatsApp 13/16, 43/45 (one wrong product pick), invoices 4/4.
 
+## 043 · The company policy is stored as numbered rules with embeddings, in Postgres (2026-10-13)
+
+**Context:** Week 6 adds policy search: find the rule that answers a question, and show proposals
+next to the rule they follow. `company_policy.pdf` is 15 numbered rules (1.1 to 4.2).
+**Options:** One chunk per fixed number of characters (the usual RAG default) · one chunk per
+numbered rule · a separate vector database · pgvector inside the existing Postgres. For the
+embeddings: a hosted model now · `nomic-embed-text` on Ollama now, a hosted one by config later.
+**Choice:** Code (not a model) splits the PDF into one chunk per printed rule, with its section
+heading (`intake/policy.py`); anything that is not a heading or rule becomes an issue. Each rule is
+embedded with its section title in front (a short rule like "Reminders must be polite" needs to
+know it is about customer credit) and stored in `policy_rules` with a `vector(768)` column, in
+the same Postgres (the Docker and CI image is now `pgvector/pgvector:pg16`, same Postgres 16).
+Embeddings come from `nomic-embed-text` through LiteLLM (`app/llm/embeddings.py`, same app queue,
+errors and tracing as chat calls); each rule records which model made its vector, because a
+question must be embedded by the same model. Uploading the policy again replaces all rules in one
+transaction and is allowed for the same file, which is how rules are re-embedded after a model
+change; if embedding fails nothing is replaced. No vector index: with 15 rules an exact scan is
+instant and exactly right (an HNSW index is approximate and only pays off at thousands of rows).
+**Why:** A rule is the natural unit: a fixed-size chunk would cut rules in half and mix two
+rules in one vector, and a code split keeps rule numbers and wording exactly as printed. pgvector
+keeps rules, proposals and audit rows in one database with one backup, and the same transactions.
+The width 768 is fixed by the column, so a hosted model must produce 768 numbers (many can be
+asked to) or a migration is needed; embed_texts() refuses other widths with a clear message.
+**Switching the database image:** the old volume came from the Alpine image (musl), the new one
+is Debian (glibc), whose text sorting can differ. The dev database was dumped with `pg_dump`, the
+volume recreated and restored (37 proposals, 4 invoices and 30 audit rows came back unchanged).
+
 ---
 
 ## Ideas

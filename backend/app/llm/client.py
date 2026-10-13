@@ -104,7 +104,7 @@ async def _call(
 ) -> str:
     # Wait in the app's own queue first: a local model answers one request at a time, and a
     # call waiting in the model's queue would use up its timeout before it even starts.
-    async with _queue(settings.llm_max_concurrency):
+    async with call_queue(settings.llm_max_concurrency):
         try:
             response = await completion(
                 model=settings.llm_model,
@@ -141,8 +141,11 @@ async def _call(
 _queues: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = WeakKeyDictionary()
 
 
-def _queue(size: int) -> asyncio.Semaphore:
-    """One queue per event loop (tests run several loops; a semaphore belongs to one)."""
+def call_queue(size: int) -> asyncio.Semaphore:
+    """One queue per event loop (tests run several loops; a semaphore belongs to one).
+
+    Shared by every kind of model call (answers and embeddings): one local Ollama serves both.
+    """
     loop = asyncio.get_running_loop()
     if loop not in _queues:
         _queues[loop] = asyncio.Semaphore(max(size, 1))

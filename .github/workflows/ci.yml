@@ -25,7 +25,7 @@ jobs:
     # Same image as docker-compose.yml, so CI tests the same database version.
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: opspilot
           POSTGRES_PASSWORD: opspilot # a test database that lives only for this run; not a secret

@@ -15,7 +15,9 @@ from app.intake.errors import IntakeError
 MAX_PAGES = 20  # an invoice, not a catalogue
 
 
-def pdf_text(content: bytes) -> str:
+def pdf_text(
+    content: bytes, *, scanned_hint: str = "Ask the supplier for the digital invoice."
+) -> str:
     try:
         reader = PdfReader(BytesIO(content))
         if reader.is_encrypted:
@@ -23,7 +25,7 @@ def pdf_text(content: bytes) -> str:
         pages = reader.pages
         if len(pages) > MAX_PAGES:
             raise IntakeError(
-                "too_many_pages", f"Invoices of more than {MAX_PAGES} pages aren't supported."
+                "too_many_pages", f"PDFs of more than {MAX_PAGES} pages aren't supported."
             )
         # Layout mode keeps each table row on one line, as printed ("1  FR PVC Wire ...  20
         # 1,620.00  32,400.00"). The default puts every cell on its own line, and a model
@@ -35,8 +37,7 @@ def pdf_text(content: bytes) -> str:
     if len(text.strip()) < 20:
         raise IntakeError(
             "no_text",
-            "The PDF has no readable text (probably a scanned picture). Ask the supplier for "
-            "the digital invoice.",
+            f"The PDF has no readable text (probably a scanned picture). {scanned_hint}",
         )
     return text
 

@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # wait in the app instead of timing out in the model's queue. Raise for a hosted model.
     llm_max_concurrency: int = 1
 
+    # Embeddings (policy search, decision 043): a text becomes a list of 768 numbers (the width of
+    # the policy_rules.embedding column, EMBEDDING_DIM in db/models.py), so a model with another
+    # width needs a migration. nomic-embed-text wants a short task prefix before each text.
+    embedding_model: str = "ollama/nomic-embed-text"
+    embedding_document_prefix: str = "search_document: "
+    embedding_query_prefix: str = "search_query: "
+
     # Tracing with Langfuse (decision 041). Optional: with no keys, nothing is sent anywhere.
     langfuse_public_key: str | None = None
     langfuse_secret_key: SecretStr | None = None

@@ -53,6 +53,11 @@ class CustomersUploadOut(UploadSummaryOut):
     updated: list[str] = Field(description="Codes of customers whose details changed")
 
 
+class PolicyUploadOut(UploadSummaryOut):
+    rules_loaded: int
+    embedding_model: str = Field(description="The model that made the rules' embeddings")
+
+
 class DuesUploadOut(UploadSummaryOut):
     bills_loaded: int
     total_balance: Decimal
