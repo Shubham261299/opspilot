@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.llm.client import LlmError, complete_structured
+from app.llm.tracing import flush_tracing, setup_tracing
 
 MESSAGE = "20 box 1.5mm wire, 10 pkt gitti aur 50 black tape bhejo aaj"
 
@@ -28,6 +29,7 @@ async def main() -> int:
     settings = get_settings()
     print(f"Model: {settings.llm_model} at {settings.llm_base_url}")
     print(f"Message: {MESSAGE!r}")
+    print(f"Tracing to Langfuse: {'on' if setup_tracing(settings) else 'off (no keys set)'}")
     try:
         result = await complete_structured(
             [
@@ -39,7 +41,9 @@ async def main() -> int:
         )
     except LlmError as error:
         print(f"FAILED ({error.code}): {error.message}")
+        await flush_tracing()
         return 1
+    await flush_tracing()  # this script ends right away; send the trace before it does
     print(f"OK in {result.latency_ms} ms, {result.attempts} attempt(s):")
     print(json.dumps(result.value.model_dump(), indent=2, ensure_ascii=False))
     return 0

@@ -26,6 +26,7 @@ from app.config import get_settings
 from app.db.session import get_engine, get_sessionmaker
 from app.intake.product_picks import ask_llm
 from app.intake.whatsapp_import import fail_interrupted_uploads
+from app.llm.tracing import setup_tracing
 from app.logging_config import new_request_id, request_id_var, setup_logging
 
 setup_logging(get_settings().log_level)
@@ -36,6 +37,7 @@ logger = logging.getLogger("app.request")
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # A chat being read when the server stopped will never finish: say so instead of
     # leaving it "processing" for ever.
+    setup_tracing()  # only does anything when Langfuse keys are configured
     await fail_interrupted_uploads()
     # Paused approval agents live in Postgres; open the checkpointer once for the app's life.
     async with open_checkpointer(get_settings().database_url) as checkpointer:

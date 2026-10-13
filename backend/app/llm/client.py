@@ -25,6 +25,7 @@ from weakref import WeakKeyDictionary
 from pydantic import BaseModel, ValidationError
 
 from app.config import Settings, get_settings
+from app.llm.tracing import trace_metadata
 
 # LiteLLM downloads a model price list from the internet when imported, unless told to use
 # its bundled copy. Keep the app offline-capable and private.
@@ -113,6 +114,7 @@ async def _call(
                 response_format=schema,
                 temperature=0,  # the same input should give the same answer
                 timeout=settings.llm_timeout_s,
+                metadata=trace_metadata(purpose, attempt),  # read only by tracing callbacks
             )
         except Exception as exc:  # connection refused, timeout, unknown model, provider error
             logger.warning(

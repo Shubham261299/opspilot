@@ -54,6 +54,8 @@ async def test_a_valid_answer_is_returned_as_the_schema() -> None:
     assert (result.attempts, result.model) == (1, "ollama_chat/qwen2.5:7b")
     call = model.calls[0]
     assert (call["response_format"], call["temperature"], call["messages"]) == (Lines, 0, ASK)
+    assert call["metadata"]["generation_name"] == "test"  # what a tracing callback shows
+    assert call["metadata"]["tags"] == ["test", "attempt-1"]
 
 
 async def test_json_wrapped_in_a_code_fence_is_accepted() -> None:

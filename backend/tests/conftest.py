@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -7,6 +8,11 @@ import pytest
 
 from app.db.seed import ProductRow, SupplierRow, read_csv_rows
 from app.domain.catalog import Catalog, CatalogProduct, CatalogSupplier
+
+# A developer's .env may hold real Langfuse keys. Tests must never send traces, so blank them:
+# environment variables win over .env in Settings, and empty keys mean tracing is off.
+for _name in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"):
+    os.environ[_name] = ""
 
 # backend/tests/conftest.py -> repo root
 SAMPLE_DATA_DIR = Path(__file__).resolve().parents[2] / "sample_data"

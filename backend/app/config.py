@@ -39,6 +39,16 @@ class Settings(BaseSettings):
     # wait in the app instead of timing out in the model's queue. Raise for a hosted model.
     llm_max_concurrency: int = 1
 
+    # Tracing with Langfuse (decision 041). Optional: with no keys, nothing is sent anywhere.
+    langfuse_public_key: str | None = None
+    langfuse_secret_key: SecretStr | None = None
+    # Cloud EU; use https://us.cloud.langfuse.com for a US project, or your own server's URL.
+    langfuse_host: str = "https://cloud.langfuse.com"
+
+    @property
+    def langfuse_enabled(self) -> bool:
+        return bool(self.langfuse_public_key and self.langfuse_secret_key)
+
 
 @lru_cache
 def get_settings() -> Settings:

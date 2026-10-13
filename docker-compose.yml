@@ -35,6 +35,10 @@ services:
       # 14b for the demo: more accurate than 7b, 2.6x slower (decision 029); 7b for quick dev runs
       LLM_MODEL: ${LLM_MODEL:-ollama_chat/qwen2.5:14b}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      # Optional tracing in Langfuse (decision 041); empty = off.
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-https://cloud.langfuse.com}
     extra_hosts:
       - "host.docker.internal:host-gateway" # Docker Desktop has this name; Linux needs this line
     ports:
