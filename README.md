@@ -18,7 +18,7 @@ The customer is fictional: **Sharma Traders**, an electrical and hardware parts 
 Pune with 60 products, 25 shop-owner customers and 6 suppliers. Every name, number and record in
 this repo is invented.
 
-> **Status:** building in public, week 4 of 7 done (v0.3a); next is tracing and evals. Only
+> **Status:** building in public, week 5 of 7 done (v0.3); next is policy search. Only
 > features marked ✅ work today; the rest is on the [roadmap](#roadmap).
 
 ## What works so far
@@ -35,10 +35,12 @@ this repo is invented.
 | Reorder and credit rules from the company policy, as pure functions: 8 of 8 expected reorders with the exact quantities, and 10 of 10 expected payment actions (answer-key tests) | ✅ |
 | Approval Inbox: *Run checks* proposes reorders, payment reminders and order holds with the numbers behind them; approving creates the purchase order, the hold or a reminder ready to send, rejecting records why, and every decision is written to the audit log | ✅ |
 | Customers page with credit terms, balances and hold status | ✅ |
-| WhatsApp orders: a chat export is read by a local language model in the background; products are matched by code first and the model second, and anything doubtful goes to review, never guessed. Each order waits in the Approval Inbox to be confirmed; the owner can fix any line. Measured against the answer key with `scripts/score_parser.py`: qwen2.5:14b gets 15 of 16 orders fully right and 44 of 45 lines exact, with 0 wrong products or quantities (the last line goes to review); qwen2.5:7b gets 14 of 16 and 44 of 45, also 0 wrong, 2× faster | ✅ |
+| WhatsApp orders: a chat export is read by a local language model in the background; products are matched by code first and the model second, and anything doubtful goes to review, never guessed. Each order waits in the Approval Inbox to be confirmed; the owner can fix any line. Measured against the answer key with the eval suite (`python evals/run.py whatsapp`, 13 Oct 2026): qwen2.5:14b gets 15 of 16 orders fully right and 44 of 45 lines exact, with 0 wrong products or quantities (the last line goes to review); qwen2.5:7b gets 13 of 16 and 43 of 45, 2× faster, and picked one wrong product (marked "matched by the model" for the owner to check). One run each; the same model can read an ambiguous line differently between runs | ✅ |
 | Approval agents (LangGraph): each proposal pauses at `interrupt()` until the owner decides, saved in Postgres so it survives a restart (an agent cut off while explaining carries on from its checkpoint when the API starts), then the decision is applied and audited | ✅ |
 | Explanations written by the language model, with every number checked by code: on the first real run 33 of 34 passed, and the one rejected had invented an amount, so the code's own wording was shown instead | ✅ |
-| CI on every pull request and push to `main`: lint, tests against a real Postgres, frontend type-check, lint and build | ✅ |
+| CI on every pull request and push to `main`: lint, tests against a real Postgres, the evals replayed from recordings, frontend type-check, lint and build | ✅ |
+| Tracing of every model call in Langfuse (optional: set the three `LANGFUSE_*` keys in `.env`; without them nothing is sent and the app behaves the same): prompt, answer, model, tokens, latency, and whether the repair retry was needed. Tracing can't break a call, as a test shows | ✅ |
+| Eval suite (`evals/`): the WhatsApp order reading and the invoice reading are scored against the answer key. With the real model, qwen2.5:14b reads all 4 sample invoices right (12 of 12 lines, every total to the paisa), and so does 7b. CI replays recorded model answers, so it catches broken reading code or scoring without needing a model (it can't tell if the model got worse: only a real run can) | ✅ |
 | Live updates over a WebSocket: new proposals, AI explanations, decisions and finished uploads appear in the Approval Inbox, Orders and Upload pages without a refresh, and the connection comes back by itself after a restart | ✅ |
 | Supplier invoice PDFs: drop several at once on the Upload page; the text is read with pypdf, the item table by code, the header and totals by the language model, and code checks every line, the subtotal, GST and the grand total to the paisa. An Invoices page shows each line next to the last purchase rate. On a real run (qwen2.5:14b) all 4 sample invoices were read and every line matched | ✅ |
 | Anomaly checks from the company policy, as pure functions: a duplicate invoice is saved as `duplicate` and can never be approved (1 of 1, also when both copies arrive at once); an invoice rate more than 10% above the last purchase rate is flagged (1 of 1: ₹63.36 against ₹48, +32.0%); an order more than 5× the customer's usual quantity is flagged (Royal Hardware's 200 coils, 120×), shown on the order's Inbox card. Honest note: against the counter-sized sample sales history the order rule also flags 27 bulk lines the answer key doesn't list, so confirmed orders become the baseline as they build up ([decision 036](docs/decisions.md)) | ✅ |
@@ -140,7 +142,8 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 pytest                           # unit tests + database tests (a fake model; no LLM needed)
 ruff check . && ruff format --check .
-cd .. && python scripts/score_parser.py   # WhatsApp parser vs the answer key, with the real model
+python -m pytest ../evals        # the evals, replayed from recorded model answers (no LLM)
+cd .. && python evals/run.py all # the evals with the real model (Ollama); see evals/README.md
 ```
 
 Frontend, with instant reload while you edit (needs the API running on port 8000):
@@ -173,7 +176,7 @@ More pieces arrive as the features that need them ship.
 | 2 ✅ | v0.2a | Customers, dues and sales history; reorder and payment rules; Approval Inbox |
 | 3 ✅ | v0.2 | LLM agents (LiteLLM, LangGraph) that pause for approval; WhatsApp orders |
 | 4 ✅ | v0.3a | PDF supplier invoices, anomaly checks, live inbox (WebSockets) |
-| 5 | v0.3 | Tracing (Langfuse) and an eval suite in CI |
+| 5 ✅ | v0.3 | Tracing (Langfuse) and an eval suite in CI |
 | 6 | v0.4 | Policy search (pgvector); proposals cite the rule they follow |
 | 7 | v1.0 | Public demo |
 
@@ -181,3 +184,7 @@ More pieces arrive as the features that need them ship.
 
 Each real design choice, with the options considered, is recorded in
 [docs/decisions.md](docs/decisions.md).
+
+## License
+
+[MIT](LICENSE).

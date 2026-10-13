@@ -425,7 +425,7 @@ rest goes to the model to pick from the catalogue; code checks every SKU it retu
 unsure pick, no pick, an unknown SKU or a pick for words it wasn't asked about stays unmatched
 for the owner. Model: qwen2.5:14b by default in Docker, qwen2.5:7b for quick development runs.
 **Why:** Measured with `scripts/score_parser.py` on the final code (results in
-`scripts/results/`): 14b 15/16 orders fully right, 44/45 lines, 436 s; 7b 14/16, 44/45, 215 s;
+`scripts/results/`; since week 5 this is `evals/run.py whatsapp`, decision 042): 14b 15/16 orders fully right, 44/45 lines, 436 s; 7b 14/16, 44/45, 215 s;
 both with 0 wrong products or quantities and 4/4 non-orders. The first prompt scored 12/16 and
 40/45 with 7b; general prompt rules and small, tested code rules brought it up. Caveat: the
 prompt was improved on this same sample, as there is no second chat to test on, so these are
@@ -543,6 +543,60 @@ decision before *wait* goes straight to the approve/reject code (decision 031).
 durable, not only the pause at `interrupt()`. Tested by crashing an agent mid-explanation and
 recovering it with a new runner; on the dev stack the stuck proposal was explained on the next
 start.
+
+## 041 · Trace model calls in Langfuse Cloud, as an optional extra (2026-10-13)
+
+**Context:** Week 5 adds tracing: for every model call, see the prompt, the answer, the timing and
+whether the repair retry was needed. LiteLLM can report each call to Langfuse through a callback.
+**Options:** Self-hosted Langfuse in Docker Compose (private, no limits, but extra containers:
+a database, ClickHouse, Redis, and a public demo would have to host them too) · Langfuse Cloud,
+free "Hobby" plan (50,000 units a month, 30 days of data, no credit card; as listed on its
+pricing page in October 2026) · write our own trace table.
+**Choice:** Langfuse Cloud, through LiteLLM's `langfuse_otel` callback (it sends OpenTelemetry
+spans, so the app needs two OpenTelemetry packages but not the Langfuse SDK). Tracing is off
+unless `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set, and `LANGFUSE_HOST` picks the
+region (or a self-hosted server: only the URL changes). Each call is named after its `purpose`
+and tagged with the attempt number, so a repair retry shows as its own call.
+**Why:** The demo needs a few runs a month, far under the free limit, and there is nothing to host.
+Tracing only observes: spans are sent from a background thread, and a failing callback is
+swallowed by LiteLLM, so an unreachable Langfuse can slow nothing down and fail no order or
+invoice (a unit test makes a callback raise inside a real `litellm.acompletion`; a manual run with
+an unreachable host logged a warning and the call succeeded). Prompts, which can hold customers'
+messages, are not written to our own logs (rule on logging) but are visible in Langfuse; that is
+acceptable only because all data is fictional (CLAUDE.md rule 7). If the limit is ever hit, tracing
+stops and the app carries on.
+
+Checked against a real Langfuse Cloud project (13 Oct 2026): a smoke call showed up with the model
+name, prompt, answer, token counts, latency and our `purpose`/`attempt` metadata. Found on the way:
+LiteLLM reports a finished call from a background task and the exporter sends in batches, so a
+script that exits right after its last call lost the trace. `flush_tracing()` (used by
+`app.llm.smoke` and `evals/run.py`) waits briefly and flushes; a server doesn't need it. The tests
+blank the Langfuse keys, so a developer's real `.env` can never make a test send a trace.
+
+## 042 · Evals: scored against the answer key, replayed from recordings in CI (2026-10-13)
+
+**Context:** Week 5 adds an eval suite, and CI must run it. CI has no language model, and the
+README's accuracy numbers must come from real runs. The old `scripts/score_parser.py` covered
+only WhatsApp orders and had no way to run without Ollama.
+**Options:** Evals only on a developer's machine · evals in CI against a fake model that returns
+made-up answers · evals in CI that replay answers recorded from the real model.
+**Choice:** A `evals/` package with two suites (WhatsApp orders; the 4 invoice PDFs), run
+by `python evals/run.py <suite>` against the real model (results saved in `evals/results/`) and
+as pytest tests that replay a *tape* (`evals/recordings/<suite>.json`) in CI. The tape stores each
+raw model answer under a hash of the request (messages + output schema); it sits one level
+below `complete_structured`, so fence-stripping, validation and the repair retry run for real
+too. The test passes when the replayed score equals the score stored with the tape. A request
+the tape lacks (a prompt or schema changed) is reported as "out of date, record again", not
+as a bad score. Ground truth for invoices is a new `expected_invoices` block in
+`answer_key.json` (also emitted by `gen_data.py`; the other data is byte-identical when the
+generator is re-run). `scripts/score_parser.py` is replaced.
+**Why:** A fake with made-up answers would make the score meaningless; replaying real answers
+keeps CI deterministic and free, and still fails when reading code, matching, arithmetic checks
+or scoring break (tried: disabling the date parser took the invoices fully right from 4 to 0).
+The cost, written in `evals/README.md`: CI cannot see a model getting worse, only a real run
+can, and tapes must be re-recorded (about 10 minutes with qwen2.5:14b) after a prompt change.
+First recorded runs (13 Oct 2026): 14b WhatsApp 15/16 orders, 44/45 lines, 4/4 non-orders;
+invoices 4/4, 12/12 lines. 7b: WhatsApp 13/16, 43/45 (one wrong product pick), invoices 4/4.
 
 ---
 
