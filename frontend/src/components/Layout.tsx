@@ -9,6 +9,7 @@ const LINKS = [
   { to: '/inbox', label: 'Approval Inbox' },
   { to: '/orders', label: 'Orders' },
   { to: '/invoices', label: 'Invoices' },
+  { to: '/policy', label: 'Policy' },
   { to: '/stock', label: 'Stock' },
   { to: '/customers', label: 'Customers' },
   { to: '/issues', label: 'Issues' },

@@ -1,4 +1,4 @@
-import { ArrowRight, CircleCheck, CircleX, FileText, LoaderCircle } from 'lucide-react'
+import { ArrowRight, CircleCheck, CircleX, FileText, LoaderCircle, type LucideIcon } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
 
@@ -13,6 +13,7 @@ import {
   ApiError,
   type CustomersUploadResult,
   type DuesUploadResult,
+  type PolicyUploadResult,
   type SalesUploadResult,
   type StockUploadResult,
   type Upload,
@@ -27,7 +28,8 @@ interface FileKind<T extends UploadSummary> {
   title: string
   description: string
   example: string // the sample file's name
-  extension: '.xlsx' | '.csv'
+  extension: '.xlsx' | '.csv' | '.pdf'
+  icon?: LucideIcon
   send: (file: File) => Promise<T>
   details: (result: T) => ReactNode // what this kind of file adds to the summary
 }
@@ -85,6 +87,23 @@ const SALES: FileKind<SalesUploadResult> = {
   ),
 }
 
+const POLICY: FileKind<PolicyUploadResult> = {
+  title: '7 · Company policy',
+  description: 'The rules proposals follow. Each rule is embedded so the Policy page can search them by meaning.',
+  example: 'company_policy.pdf',
+  extension: '.pdf',
+  icon: FileText,
+  send: api.uploadPolicy,
+  details: (r) => (
+    <>
+      {plural(r.rules_loaded, 'rule')} saved, embedded with {r.embedding_model} ·{' '}
+      <Link to="/policy" className="underline">
+        Open the Policy page
+      </Link>
+    </>
+  ),
+}
+
 export function UploadPage() {
   return (
     <>
@@ -107,6 +126,7 @@ export function UploadPage() {
         <UploadCard kind={SALES} />
         <WhatsAppCard />
         <InvoiceCard />
+        <UploadCard kind={POLICY} />
       </div>
     </>
   )
@@ -136,7 +156,7 @@ function UploadCard<T extends UploadSummary>({ kind }: { kind: FileKind<T> }) {
   }
 
   const failedUploadId = error instanceof ApiError ? uploadIdFrom(error.details) : null
-  const accept = kind.extension === '.csv' ? '.csv,text/csv' : '.xlsx'
+  const accept = { '.csv': '.csv,text/csv', '.pdf': '.pdf,application/pdf', '.xlsx': '.xlsx' }[kind.extension]
 
   return (
     <Card>
@@ -148,6 +168,7 @@ function UploadCard<T extends UploadSummary>({ kind }: { kind: FileKind<T> }) {
         <FileDropZone
           label={`Drop ${kind.example} here`}
           hint={`or click to choose · ${kind.extension}, up to 5 MB`}
+          icon={kind.icon}
           accept={accept}
           busyLabel={sending && `Uploading ${sending}…`}
           onFile={(file) => void send(file)}

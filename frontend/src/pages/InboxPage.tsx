@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { PageHeader } from '@/components/PageHeader'
+import { PolicyCitations } from '@/components/PolicyCitations'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -238,6 +239,7 @@ function ProposalCard({ proposal, approveLabel, onDecided, onStale }: ProposalCa
         )}
         {proposal.kind === 'confirm_order' && <OrderLines proposal={proposal} />}
         {proposal.kind === 'approve_invoice' && <InvoicePriceCheck proposal={proposal} />}
+        <PolicyCitations citations={proposal.policy} />
         {proposal.draft_message && (
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
             <p className="mb-1 text-xs text-muted-foreground">Message to the customer, sent when approved:</p>

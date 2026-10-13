@@ -183,6 +183,15 @@ export function invoiceNumbers(proposal: Proposal): InvoiceProposalNumbers {
   return proposal.numbers as unknown as InvoiceProposalNumbers
 }
 
+/** A policy rule a proposal follows, chosen by code (not by search). `text` is null until the
+ * policy has been uploaded. */
+export interface PolicyCitation {
+  code: string // the rule's number in the policy, e.g. "2.4"
+  why: string // what this proposal did with the rule
+  section_title: string | null
+  text: string | null
+}
+
 export interface Proposal {
   id: number
   kind: ProposalKind
@@ -203,6 +212,7 @@ export interface Proposal {
   explanation: string | null // written by the language model, checked by code
   explained_by: 'llm' | 'template' | null // null: still being written
   draft_message: string | null // a reminder's message to the customer
+  policy: PolicyCitation[] // the rules this proposal follows
 }
 
 export interface OrderLine {
@@ -285,11 +295,41 @@ export interface Invoice {
   proposal_id: number | null // null: a duplicate, never proposed for payment
   ready: boolean | null
   price_jumps: number | null
+  policy: PolicyCitation[] // the rules its proposal follows; empty for a duplicate
   created_at: string
 }
 
 export interface InvoiceList {
   items: Invoice[]
+}
+
+export interface PolicyRule {
+  code: string
+  section_no: number
+  section_title: string
+  text: string
+}
+
+export interface PolicyList {
+  items: PolicyRule[]
+  embedding_model: string | null
+  uploaded_at: string | null
+}
+
+/** A rule found by a search; `score` ranks the rules (cosine similarity), it is not a probability. */
+export interface PolicySearchHit extends PolicyRule {
+  score: number
+}
+
+export interface PolicySearchResult {
+  query: string
+  embedding_model: string | null // null: no policy has been uploaded yet
+  items: PolicySearchHit[]
+}
+
+export interface PolicyUploadResult extends UploadSummary {
+  rules_loaded: number
+  embedding_model: string
 }
 
 export interface ProposalList {
@@ -403,7 +443,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T
 }
 
-export type UploadKind = 'stock' | 'customers' | 'dues' | 'sales' | 'whatsapp' | 'invoice'
+export type UploadKind = 'stock' | 'customers' | 'dues' | 'sales' | 'whatsapp' | 'invoice' | 'policy'
 
 function upload<T>(kind: UploadKind, file: File): Promise<T> {
   const form = new FormData()
@@ -426,6 +466,13 @@ export const api = {
   uploadSales: (file: File) => upload<SalesUploadResult>('sales', file),
   uploadWhatsapp: (file: File) => upload<UploadAccepted>('whatsapp', file),
   uploadInvoice: (file: File) => upload<UploadAccepted>('invoice', file),
+  uploadPolicy: (file: File) => upload<PolicyUploadResult>('policy', file),
+  policy(): Promise<PolicyList> {
+    return request('/policy')
+  },
+  searchPolicy(question: string, limit = 3): Promise<PolicySearchResult> {
+    return request(`/policy/search?q=${encodeURIComponent(question)}&limit=${limit}`)
+  },
   invoices(): Promise<InvoiceList> {
     return request('/invoices')
   },

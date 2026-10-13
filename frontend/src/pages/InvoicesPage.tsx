@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 
 import { ErrorAlert } from '@/components/ErrorAlert'
 import { PageHeader } from '@/components/PageHeader'
+import { PolicyCitations } from '@/components/PolicyCitations'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -93,6 +94,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
           </Notice>
         )}
         <InvoiceLines invoice={invoice} />
+        <PolicyCitations citations={invoice.policy} />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
           {invoice.price_jumps !== null && invoice.price_jumps > 0 && (
             <Badge className="bg-amber-100 text-amber-900">
