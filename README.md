@@ -1,27 +1,57 @@
-<div align="center">
-
-<img src=".github/banner.svg" width="100%" alt="Shubham AI Lab, system 04 of 07 (In Progress · Building In Public): WhatsApp / Excel / PDF → Clean + validate → Agent proposals → Owner approval → Audit row. Stack: FastAPI, PostgreSQL, LangGraph, React, Docker.">
-
-[🌐 Portfolio](https://shubham-ai-lab.vercel.app/) · [👤 GitHub profile](https://github.com/Shubham261299) · [💼 LinkedIn](https://www.linkedin.com/in/shubham-jamdar-2571271b3)
-
-</div>
+<img src="docs/images/cover.webp" width="100%" alt="OpsPilot cover illustration: a distributor’s orders, stock records and invoices collected for owner approval.">
 
 # OpsPilot
 
+### From messy orders to actions you approve.
+
+An AI back office for a small distributor. WhatsApp exports, stock spreadsheets and supplier invoices become clean data and reviewable proposals—with the owner in control.
+
+**[Run it locally →](#run-it-locally)** · [Explore the case study ↗](https://shubham-ai-lab.vercel.app/work/opspilot) · [Architecture](#how-it-works) · [Roadmap](#roadmap)
+
+**Status: v0.4 · Local app.** A hosted public demo is planned, not available yet. The sample business, Sharma Traders in Pune, and every customer, supplier and record are fictional.
+
 [![CI](https://github.com/Shubham261299/opspilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Shubham261299/opspilot/actions/workflows/ci.yml)
 
-An AI back office for a small distributor. OpsPilot turns messy WhatsApp orders, an Excel stock
-sheet and PDF supplier invoices into clean data. Agents then propose actions (reorders, payment
-reminders, anomaly flags), and the owner approves every action before anything happens.
+## See the approval workflow
 
-The customer is fictional: **Sharma Traders**, an electrical and hardware parts distributor in
-Pune with 60 products, 25 shop-owner customers and 6 suppliers. Every name, number and record in
-this repo is invented.
+![Real app screenshot: proposals in the Approval Inbox, with explanations and owner review](docs/inbox.png)
 
-> **Status:** building in public, week 6 of 7 done (v0.4); next is the public demo. Only
-> features marked ✅ work today; the rest is on the [roadmap](#roadmap).
+*Actual local-app screenshot. The cover above is an illustration.*
 
-## What works so far
+## One order, end to end
+
+```mermaid
+flowchart TD
+    A[Import a chat export] --> B[Read and match order lines]
+    B --> C{Match is uncertain?}
+    C -->|Yes| D[Owner corrects the line]
+    C -->|No| E[Prepare proposal]
+    D --> E
+    E --> F[Pause for owner approval]
+    F --> G[Apply decision and record audit]
+```
+
+Code calculates quantities, amounts and policy decisions. Local models read messy text and explain proposals; doubtful matches go to review. Approval creates the relevant record or a reminder ready to send—it does not automatically send a message or make a payment.
+
+## Engineering receipt
+
+| Choice | What it means here |
+| --- | --- |
+| Code checks the numbers | Model-written explanations are rejected if they introduce amounts that code did not produce. |
+| Approval survives a restart | LangGraph checkpoints in Postgres keep proposals waiting for the owner's decision. |
+| Search is not policy authority | Semantic search helps find rules; proposals cite a fixed mapping in code. |
+| Show the rough edges | Small sample evaluations and documented anomaly false positives remain visible below. |
+
+## What works today
+
+- Clean stock, customer, dues and sales files; preserve issues and audit records.
+- Propose reorders, reminders and holds from deterministic policy rules.
+- Read WhatsApp orders and PDF invoices with local models and code validation.
+- Review proposals in an approval inbox with live updates.
+- Search policy text and inspect the numbered rules supporting a proposal.
+
+<details>
+<summary><strong>Detailed feature checklist, measured results and known limitations</strong></summary>
 
 | Feature | Status |
 | --- | --- |
@@ -47,6 +77,9 @@ this repo is invented.
 | Supplier invoice PDFs: drop several at once on the Upload page; the text is read with pypdf, the item table by code, the header and totals by the language model, and code checks every line, the subtotal, GST and the grand total to the paisa. An Invoices page shows each line next to the last purchase rate. On a real run (qwen2.5:14b) all 4 sample invoices were read and every line matched | ✅ |
 | Anomaly checks from the company policy, as pure functions: a duplicate invoice is saved as `duplicate` and can never be approved (1 of 1, also when both copies arrive at once); an invoice rate more than 10% above the last purchase rate is flagged (1 of 1: ₹63.36 against ₹48, +32.0%); an order more than 5× the customer's usual quantity is flagged (Royal Hardware's 200 coils, 120×), shown on the order's Inbox card. Honest note: against the counter-sized sample sales history the order rule also flags 27 bulk lines the answer key doesn't list, so confirmed orders become the baseline as they build up ([decision 036](docs/decisions.md)) | ✅ |
 | Invoices wait in the Approval Inbox as "approve for payment" proposals, with any price jump marked for the owner; approval is refused while the supplier is unknown, a line has no product or the figures don't add up | ✅ |
+
+
+</details>
 
 ## Run it locally
 
@@ -142,7 +175,7 @@ flowchart LR
 
 Code calculates every quantity, amount and date; the language model only reads messy text and
 words explanations, and its text is rejected if it contains a number the code didn't produce.
-Nothing is ordered, held, sent, confirmed or paid until the owner approves it.
+The owner approves before an operation is applied. Approval creates the purchase order, hold, confirmed order, invoice approval or reminder ready to send, plus an audit record; it does not itself send reminders or transfer money.
 
 ## Run the tests
 
@@ -200,3 +233,8 @@ Each real design choice, with the options considered, is recorded in
 ## License
 
 [MIT](LICENSE).
+
+
+---
+
+[Explore more of my work →](https://shubham-ai-lab.vercel.app/work) · [GitHub profile](https://github.com/Shubham261299)
